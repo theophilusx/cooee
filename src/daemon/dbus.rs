@@ -107,6 +107,16 @@ impl NotificationServer {
     async fn action_invoked(ctx: &SignalContext<'_>, id: u32, action_key: String) -> zbus::Result<()>;
 }
 
+/// Public helper to emit the `ActionInvoked` D-Bus signal.
+pub async fn emit_action_invoked(conn: &Connection, id: u32, action_key: String) -> zbus::Result<()> {
+    let iface_ref = conn
+        .object_server()
+        .interface::<_, NotificationServer>("/org/freedesktop/Notifications")
+        .await?;
+    let ctx = iface_ref.signal_context();
+    NotificationServer::action_invoked(ctx, id, action_key).await
+}
+
 pub async fn start_dbus_server(
     state: SharedState,
     config: Arc<Config>,
