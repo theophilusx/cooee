@@ -92,7 +92,9 @@ pub fn run() -> Result<()> {
     let config_for_gtk = config.clone();
 
     app.connect_activate(move |app| {
-        let manager = Arc::new(Mutex::new(NotificationManager::new(config_for_gtk.clone(), action_tx_for_gtk.clone())));
+        let mgr_instance = NotificationManager::new(config_for_gtk.clone(), action_tx_for_gtk.clone());
+        mgr_instance.init_css();
+        let manager = Arc::new(Mutex::new(mgr_instance));
         let app_clone = app.clone();
         let queue = event_queue.clone();
 

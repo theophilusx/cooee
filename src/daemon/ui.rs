@@ -6,6 +6,61 @@ use crate::notification::Notification;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+/// Generates the CSS string for notification windows based on config.
+pub fn build_css(config: &Config) -> String {
+    let fs = config.general.font_size;
+    let fs_summary = fs + 1;
+    let fs_body = fs - 1;
+    format!(r#"
+.notification-card {{
+    background-color: rgba(28, 28, 36, 0.95);
+    border: 1px solid rgba(120, 160, 230, 0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #d0d4e8;
+    font-size: {fs}px;
+}}
+.notification-summary {{
+    font-weight: bold;
+    font-size: {fs_summary}px;
+    color: #e0e4f8;
+}}
+.notification-body {{
+    color: #a8b0cc;
+    font-size: {fs_body}px;
+    margin-top: 2px;
+}}
+.notification-dismiss {{
+    background: transparent;
+    border: none;
+    color: #606480;
+    padding: 0 4px;
+    min-width: 0;
+    min-height: 0;
+    margin-left: auto;
+    font-size: {fs}px;
+}}
+.notification-dismiss:hover {{
+    color: #e08090;
+    background: transparent;
+}}
+.notification-actions {{
+    margin-top: 6px;
+}}
+.notification-action-btn {{
+    background-color: rgba(120, 160, 230, 0.12);
+    border: 1px solid rgba(120, 160, 230, 0.28);
+    border-radius: 6px;
+    color: #88aaee;
+    padding: 3px 10px;
+    font-size: {fs_body}px;
+}}
+.notification-action-btn:hover {{
+    background-color: rgba(120, 160, 230, 0.24);
+}}
+"#)
+}
+
 /// Events sent from the async runtime into the GTK main loop
 #[derive(Debug)]
 pub enum UiEvent {
@@ -27,7 +82,26 @@ impl NotificationManager {
         Self { config, windows: Vec::new(), action_tx }
     }
 
+    /// Load CSS into the GTK display. Must be called after the GTK display is ready.
+    pub fn init_css(&self) {
+        if let Some(display) = gdk::Display::default() {
+            let provider = gtk4::CssProvider::new();
+            provider.load_from_string(&build_css(&self.config));
+            gtk4::style_context_add_provider_for_display(
+                &display,
+                &provider,
+                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+    }
+
+    /// Remove windows that have already been destroyed.
+    fn prune_closed(&mut self) {
+        self.windows.retain(|(_, win)| win.is_realized());
+    }
+
     pub fn show(&mut self, app: &Application, notification: Notification) {
+        self.prune_closed();
         // Evict oldest if at capacity
         if self.windows.len() >= self.config.general.max_visible {
             if let Some((_, win)) = self.windows.first() {
@@ -36,7 +110,7 @@ impl NotificationManager {
             self.windows.remove(0);
         }
         let win = build_notification_window(app, &notification, &self.config, self.action_tx.clone());
-        self.position_window(&win, self.windows.len());
+        self.position_window(&win);
         win.present();
         self.windows.push((notification.id, win));
     }
@@ -45,28 +119,19 @@ impl NotificationManager {
         if let Some(pos) = self.windows.iter().position(|(wid, _)| *wid == id) {
             let (_, win) = self.windows.remove(pos);
             win.destroy();
-            self.reposition_all();
         }
     }
 
     pub fn dismiss_latest(&mut self) {
+        self.prune_closed();
         if let Some((_, win)) = self.windows.last() {
             win.destroy();
         }
         self.windows.pop();
     }
 
-    fn reposition_all(&mut self) {
-        for (i, (_, win)) in self.windows.iter().enumerate() {
-            self.position_window(win, i);
-        }
-    }
-
-    fn position_window(&self, win: &ApplicationWindow, stack_index: usize) {
+    fn position_window(&self, win: &ApplicationWindow) {
         let cfg = &self.config.general;
-        let card_height = 100i32;
-        let gap = 8i32;
-        let stack_offset = (stack_index as i32) * (card_height + gap);
 
         match cfg.position {
             Position::TopRight => {
@@ -74,7 +139,7 @@ impl NotificationManager {
                 win.set_anchor(Edge::Right, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Top, cfg.margin_y);
                 win.set_margin(Edge::Right, cfg.margin_x);
             }
             Position::TopLeft => {
@@ -82,7 +147,7 @@ impl NotificationManager {
                 win.set_anchor(Edge::Left, true);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Top, cfg.margin_y);
                 win.set_margin(Edge::Left, cfg.margin_x);
             }
             Position::BottomRight => {
@@ -90,7 +155,7 @@ impl NotificationManager {
                 win.set_anchor(Edge::Right, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Bottom, cfg.margin_y);
                 win.set_margin(Edge::Right, cfg.margin_x);
             }
             Position::BottomLeft => {
@@ -98,7 +163,7 @@ impl NotificationManager {
                 win.set_anchor(Edge::Left, true);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Bottom, cfg.margin_y);
                 win.set_margin(Edge::Left, cfg.margin_x);
             }
             Position::Center => {
@@ -106,21 +171,21 @@ impl NotificationManager {
                 win.set_anchor(Edge::Bottom, false);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
-                win.set_margin(Edge::Top, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Top, cfg.margin_y);
             }
             Position::CenterTop => {
                 win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Top, cfg.margin_y);
             }
             Position::CenterBottom => {
                 win.set_anchor(Edge::Bottom, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y + stack_offset);
+                win.set_margin(Edge::Bottom, cfg.margin_y);
             }
         }
     }
@@ -220,4 +285,36 @@ fn build_notification_window(
     }
 
     win
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config_with_font_size(font_size: i32) -> Config {
+        let mut cfg = Config::default();
+        cfg.general.font_size = font_size;
+        cfg
+    }
+
+    #[test]
+    fn build_css_contains_configured_font_size() {
+        let cfg = test_config_with_font_size(18);
+        let css = build_css(&cfg);
+        assert!(css.contains("font-size: 18px"), "expected 18px in CSS, got:\n{css}");
+    }
+
+    #[test]
+    fn build_css_summary_is_one_larger_than_base() {
+        let cfg = test_config_with_font_size(14);
+        let css = build_css(&cfg);
+        assert!(css.contains("font-size: 15px"), "summary should be 15px");
+    }
+
+    #[test]
+    fn build_css_body_is_one_smaller_than_base() {
+        let cfg = test_config_with_font_size(14);
+        let css = build_css(&cfg);
+        assert!(css.contains("font-size: 13px"), "body should be 13px");
+    }
 }

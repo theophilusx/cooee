@@ -46,6 +46,8 @@ pub struct GeneralConfig {
     pub icon_size: i32,
     #[serde(default = "GeneralConfig::default_width")]
     pub width: i32,
+    #[serde(default = "GeneralConfig::default_font_size")]
+    pub font_size: i32,
 }
 
 impl GeneralConfig {
@@ -56,6 +58,7 @@ impl GeneralConfig {
     fn default_timeout() -> u32 { 5000 }
     fn default_icon_size() -> i32 { 36 }
     fn default_width() -> i32 { 360 }
+    fn default_font_size() -> i32 { 14 }
 }
 
 impl Default for GeneralConfig {
@@ -68,6 +71,7 @@ impl Default for GeneralConfig {
             timeout: Self::default_timeout(),
             icon_size: Self::default_icon_size(),
             width: Self::default_width(),
+            font_size: Self::default_font_size(),
         }
     }
 }
@@ -241,6 +245,7 @@ mod tests {
         assert_eq!(cfg.general.timeout, 5000);
         assert_eq!(cfg.general.width, 360);
         assert_eq!(cfg.general.icon_size, 36);
+        assert_eq!(cfg.general.font_size, 14);
         assert!(cfg.sound.enabled);
         assert!((cfg.sound.volume - 0.8).abs() < 0.001);
         assert!(cfg.tts.enabled);
@@ -248,6 +253,17 @@ mod tests {
         assert_eq!(cfg.tts.body_word_limit, 15);
         assert_eq!(cfg.tts.rate, 0);
         assert_eq!(cfg.actions.picker, "rofi -dmenu -p 'Action:'");
+    }
+
+    #[test]
+    fn test_font_size_can_be_set_via_toml() {
+        let toml = r#"
+[general]
+font_size = 18
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.general.font_size, 18);
+        assert_eq!(cfg.general.margin_x, 16); // other fields still default
     }
 
     #[test]
