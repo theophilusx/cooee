@@ -12,7 +12,7 @@ pub struct NotificationServer {
     state: SharedState,
     config: Arc<Config>,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
-    action_tx: mpsc::UnboundedSender<(u32, String)>,
+    action_tx: mpsc::UnboundedSender<(u32, String)>, // TODO(Task 12): used when ActionInvoked is wired
 }
 
 #[interface(name = "org.freedesktop.Notifications")]
@@ -34,14 +34,24 @@ impl NotificationServer {
             .and_then(|v| u8::try_from(v).ok())
             .unwrap_or(1);
 
+        // TODO: parse "image-data" hint; add "body-images" to capabilities when implemented
         let image_data: Option<Vec<u8>> = None;
 
-        let mut state = self.state.lock().unwrap();
-
-        // Check DND
-        if matches!(state.dnd_mode, DndMode::Full) {
-            return state.next_notification_id();
+        // Check DND Full — discard the notification but still emit NotificationClosed
+        let dnd_full_id = {
+            let mut state = self.state.lock().unwrap();
+            if matches!(state.dnd_mode, DndMode::Full) {
+                Some(state.next_notification_id())
+            } else {
+                None
+            }
+        }; // MutexGuard dropped here before any await
+        if let Some(id) = dnd_full_id {
+            let _ = Self::notification_closed(&ctx, id, 3).await;
+            return id;
         }
+
+        let mut state = self.state.lock().unwrap();
 
         let id = if replaces_id > 0 { replaces_id } else { state.next_notification_id() };
         let notification = Notification::new(
@@ -76,7 +86,6 @@ impl NotificationServer {
         vec![
             "body".into(),
             "body-markup".into(),
-            "body-images".into(),
             "icon-static".into(),
             "actions".into(),
         ]
