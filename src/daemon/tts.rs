@@ -42,15 +42,15 @@ impl TtsClient {
                 }
             };
 
-            if rate != 0 {
-                if let Err(e) = conn.set_voice_rate(rate) {
-                    eprintln!("cooee: TTS set_voice_rate failed: {}", e);
-                }
-            }
-
             if !voice.is_empty() {
                 if let Err(e) = conn.set_synthesis_voice_all(voice) {
                     eprintln!("cooee: TTS set_synthesis_voice_all failed: {}", e);
+                }
+            }
+
+            if rate != 0 {
+                if let Err(e) = conn.set_voice_rate(rate) {
+                    eprintln!("cooee: TTS set_voice_rate failed: {}", e);
                 }
             }
 

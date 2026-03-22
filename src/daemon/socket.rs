@@ -87,6 +87,13 @@ mod tests {
     }
 
     #[test]
+    fn test_command_serialise_action() {
+        let cmd = Command::Action;
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert_eq!(json, r#"{"cmd":"action"}"#);
+    }
+
+    #[test]
     fn test_command_deserialise_action() {
         let cmd: Command = serde_json::from_str(r#"{"cmd":"action"}"#).unwrap();
         assert_eq!(cmd, Command::Action);
