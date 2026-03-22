@@ -64,7 +64,7 @@ impl NotificationServer {
             let sound = crate::daemon::sound::SoundPlayer::new(self.config.sound.clone());
             sound.play();
             let tts = crate::daemon::tts::TtsClient::new(self.config.tts.clone());
-            tts.speak_summary(&notification.summary);
+            tts.speak_smart(&notification.summary, &notification.body);
         }
 
         let _ = self.ui_tx.send(UiEvent::ShowNotification(notification));
