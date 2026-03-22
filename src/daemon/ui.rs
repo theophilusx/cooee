@@ -31,7 +31,7 @@ impl NotificationManager {
         // Evict oldest if at capacity
         if self.windows.len() >= self.config.general.max_visible {
             if let Some((_, win)) = self.windows.first() {
-                win.close();
+                win.destroy();
             }
             self.windows.remove(0);
         }
@@ -44,14 +44,14 @@ impl NotificationManager {
     pub fn close(&mut self, id: u32) {
         if let Some(pos) = self.windows.iter().position(|(wid, _)| *wid == id) {
             let (_, win) = self.windows.remove(pos);
-            win.close();
+            win.destroy();
             self.reposition_all();
         }
     }
 
     pub fn dismiss_latest(&mut self) {
         if let Some((_, win)) = self.windows.last() {
-            win.close();
+            win.destroy();
         }
         self.windows.pop();
     }
@@ -175,7 +175,7 @@ fn build_notification_window(
     dismiss_btn.add_css_class("notification-dismiss");
     hbox.append(&dismiss_btn);
     let win_ref = win.clone();
-    dismiss_btn.connect_clicked(move |_| win_ref.close());
+    dismiss_btn.connect_clicked(move |_| win_ref.destroy());
     vbox.append(&hbox);
 
     // Body text (supports Pango markup)
@@ -215,7 +215,7 @@ fn build_notification_window(
     if let Some(ms) = timeout_ms {
         gtk4::glib::timeout_add_local_once(
             std::time::Duration::from_millis(ms as u64),
-            move || win_clone.close(),
+            move || win_clone.destroy(),
         );
     }
 
