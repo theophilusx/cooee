@@ -81,6 +81,7 @@ impl TtsClient {
 
 /// Returns the text to speak for a notification.
 /// Pure function — no side effects, fully testable without speech-dispatcher.
+/// `limit = 0` acts as "always speak summary only" (any non-empty body has ≥ 1 word).
 fn compose_utterance(summary: &str, body: &str, limit: u32) -> String {
     if summary.is_empty() {
         return String::new();
