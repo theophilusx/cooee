@@ -35,10 +35,6 @@ serde_json = "1"
 
 # Error handling
 anyhow = "1"
-thiserror = "1"
-
-# Config file watching
-notify = "6"
 
 [dev-dependencies]
 tempfile = "3"
