@@ -21,7 +21,7 @@ impl SoundPlayer {
             return;
         }
         let path = crate::config::Config::expand_path(&self.config.file);
-        let volume = self.config.volume;
+        let volume = self.config.volume as f32;
         std::thread::spawn(move || {
             if let Err(e) = play_file(&path, volume) {
                 eprintln!("cooee: sound error: {}", e);

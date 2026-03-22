@@ -80,7 +80,7 @@ pub struct SoundConfig {
     #[serde(default = "SoundConfig::default_file")]
     pub file: String,
     #[serde(default = "SoundConfig::default_volume")]
-    pub volume: f32,
+    pub volume: f64,
 }
 
 impl SoundConfig {
@@ -88,7 +88,7 @@ impl SoundConfig {
     fn default_file() -> String {
         "~/.config/cooee/sounds/notify.ogg".to_string()
     }
-    fn default_volume() -> f32 { 0.8 }
+    fn default_volume() -> f64 { 0.8 }
 }
 
 impl Default for SoundConfig {
@@ -177,7 +177,10 @@ impl Config {
         }
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("reading config {:?}", path))?;
-        toml::from_str(&text).with_context(|| "parsing config TOML")
+        toml::from_str(&text).with_context(|| format!(
+            "invalid config at {}\nFix the value shown above, or delete the file to regenerate defaults",
+            path.display()
+        ))
     }
 
     fn write_default(&self, path: &PathBuf) -> Result<()> {
