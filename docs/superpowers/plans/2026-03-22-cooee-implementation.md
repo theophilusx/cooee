@@ -59,7 +59,7 @@ description = "Wayland desktop notification daemon with sound and TTS"
 
 [dependencies]
 # UI / Wayland
-gtk4 = { version = "0.9", features = ["v4_12"] }
+gtk4 = { version = "0.11", features = ["v4_12"] }
 gtk4-layer-shell = "0.8"
 
 # D-Bus
@@ -72,7 +72,7 @@ tokio = { version = "1", features = ["full"] }
 rodio = { version = "0.19", default-features = false, features = ["wav", "vorbis", "mp3"] }
 
 # TTS
-speech-dispatcher = "0.6"
+speech-dispatcher = "0.16"
 
 # CLI
 clap = { version = "4", features = ["derive"] }
