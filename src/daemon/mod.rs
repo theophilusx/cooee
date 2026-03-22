@@ -172,7 +172,8 @@ async fn handle_command(
                 None => Response::err("no notification to speak"),
                 Some(n) => {
                     let tts = tts::TtsClient::new(config.tts.clone());
-                    tts.speak_body(&n.body);
+                    let text = if n.body.is_empty() { &n.summary } else { &n.body };
+                    tts.speak_body(text);
                     Response::ok()
                 }
             }
