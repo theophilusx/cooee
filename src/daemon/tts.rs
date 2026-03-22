@@ -181,6 +181,14 @@ mod tests {
     }
 
     #[test]
+    fn test_compose_body_at_exact_limit() {
+        // body_words == limit → combined branch fires (inclusive boundary)
+        let body = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen";
+        let result = compose_utterance("Summary", body, 15);
+        assert_eq!(result, format!("Summary.  {}", body));
+    }
+
+    #[test]
     fn test_compose_long_summary() {
         // summary over limit, body short → summary still spoken verbatim (no truncation)
         let summary = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen";
