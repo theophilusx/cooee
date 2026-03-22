@@ -1,0 +1,44 @@
+[package]
+name = "cooee"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+repository = "https://github.com/theophilusx/cooee"
+description = "Wayland desktop notification daemon with sound and TTS"
+
+[dependencies]
+# UI / Wayland
+# gtk4 = { version = "0.11", features = ["v4_12"] }
+# gtk4-layer-shell = "0.8"
+
+# D-Bus
+zbus = { version = "4", features = ["tokio"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Sound
+# rodio = { version = "0.19", default-features = false, features = ["wav", "vorbis", "mp3"] }
+
+# TTS
+# speech-dispatcher = "0.6"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Config
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Socket protocol
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Config file watching
+notify = "6"
+
+[dev-dependencies]
+tempfile = "3"
