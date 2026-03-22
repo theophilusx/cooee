@@ -1,5 +1,5 @@
 use gtk4::prelude::*;
-use gtk4::{gdk, glib, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
+use gtk4::{gdk, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use crate::config::{Config, Position};
 use crate::notification::Notification;
@@ -100,10 +100,11 @@ impl NotificationManager {
                 win.set_margin(Edge::Left, cfg.margin_x);
             }
             Position::Center => {
-                win.set_anchor(Edge::Top, false);
+                win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Bottom, false);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
+                win.set_margin(Edge::Top, cfg.margin_y + stack_offset);
             }
             Position::CenterTop => {
                 win.set_anchor(Edge::Top, true);
@@ -135,15 +136,16 @@ fn build_notification_window(
 
     // Set monitor if Hyprland provides one
     if let Some(monitor_name) = crate::daemon::hyprland::active_monitor_name() {
-        let display = gdk::Display::default().unwrap();
-        let monitors = display.monitors();
-        let n = monitors.n_items();
-        for i in 0..n {
-            if let Some(obj) = monitors.item(i) {
-                if let Ok(monitor) = obj.downcast::<gdk::Monitor>() {
-                    if monitor.connector().map(|c: glib::GString| c.to_string()) == Some(monitor_name.clone()) {
-                        win.set_monitor(Some(&monitor));
-                        break;
+        if let Some(display) = gdk::Display::default() {
+            let monitors = display.monitors();
+            let n = monitors.n_items();
+            for i in 0..n {
+                if let Some(obj) = monitors.item(i) {
+                    if let Ok(monitor) = obj.downcast::<gdk::Monitor>() {
+                        if monitor.connector().as_deref() == Some(monitor_name.as_str()) {
+                            win.set_monitor(Some(&monitor));
+                            break;
+                        }
                     }
                 }
             }
@@ -169,6 +171,8 @@ fn build_notification_window(
     let dismiss_btn = Button::with_label("×");
     dismiss_btn.add_css_class("notification-dismiss");
     hbox.append(&dismiss_btn);
+    let win_ref = win.clone();
+    dismiss_btn.connect_clicked(move |_| win_ref.close());
     vbox.append(&hbox);
 
     // Body text (supports Pango markup)
@@ -192,6 +196,7 @@ fn build_notification_window(
             let nid = notification.id;
             btn.connect_clicked(move |_| {
                 eprintln!("cooee: action '{}' invoked on notification {}", key, nid);
+                // TODO(Task 12): emit ActionInvoked via D-Bus channel
             });
             action_box.append(&btn);
         }
