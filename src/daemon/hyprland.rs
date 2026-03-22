@@ -43,6 +43,9 @@ fn parse_monitor_from_workspace_json(json: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_parse_monitor_from_workspace_json() {
@@ -60,6 +63,7 @@ mod tests {
 
     #[test]
     fn test_hyprland_socket_path_construction() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("HYPRLAND_INSTANCE_SIGNATURE", "abc123");
         std::env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
         let path = hyprland_socket_path().unwrap();
@@ -68,6 +72,7 @@ mod tests {
 
     #[test]
     fn test_active_monitor_name_no_hyprland_env() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::remove_var("HYPRLAND_INSTANCE_SIGNATURE");
         assert!(active_monitor_name().is_none());
     }

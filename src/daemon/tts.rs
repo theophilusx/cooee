@@ -43,8 +43,13 @@ impl TtsClient {
             };
 
             if !voice.is_empty() {
-                if let Err(e) = conn.set_synthesis_voice_all(voice) {
-                    eprintln!("cooee: TTS set_synthesis_voice_all failed: {}", e);
+                let v = speech_dispatcher::Voice {
+                    name: voice,
+                    language: String::new(),
+                    variant: None,
+                };
+                if let Err(e) = conn.set_synthesis_voice(&v) {
+                    eprintln!("cooee: TTS set_synthesis_voice failed: {}", e);
                 }
             }
 

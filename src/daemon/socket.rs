@@ -59,6 +59,9 @@ pub async fn read_command(stream: &mut UnixStream) -> Result<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_command_serialise_speak() {
@@ -116,6 +119,7 @@ mod tests {
 
     #[test]
     fn test_socket_path_uses_xdg_runtime_dir() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
         let p = socket_path();
         assert_eq!(p.to_str().unwrap(), "/run/user/1000/cooee.sock");
