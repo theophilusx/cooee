@@ -29,10 +29,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 Minimum supported Rust version: stable 1.75.
 
-**speech-dispatcher user service** — required for TTS:
-```bash
-systemctl --user enable --now speech-dispatcher
-```
+**speech-dispatcher** — required for TTS. Install the package (above) and no further setup is needed: speech-dispatcher starts automatically on first use via client-side autospawn.
 
 **`~/.local/bin` on your PATH** — the default install prefix puts the binary there:
 ```bash
@@ -192,7 +189,7 @@ Toggle with `cooee dnd toggle` (cycles: off → silent → full → off).
 | `cooee daemon is not running` | Daemon not started | `systemctl --user start cooee` |
 | No sound | Sound file missing | Check `[sound].file`; ensure `~/.config/cooee/sounds/notify.ogg` exists |
 | No sound (file exists) | Audio device unavailable | Run `cooee daemon` in a terminal to see rodio error details |
-| No TTS | speech-dispatcher not running | `systemctl --user enable --now speech-dispatcher` |
+| No TTS | speech-dispatcher not installed | Install `speech-dispatcher` package and ensure `DisableAutoSpawn` is not set in `speechd.conf` |
 | Notifications not appearing | Another daemon owns D-Bus name | `systemctl --user stop mako dunst swaync`; then `systemctl --user restart cooee` |
 | Service not starting on login | `graphical-session.target` not activated | Use uwsm, or add `exec-once = systemctl --user start graphical-session.target` to `hyprland.conf` |
 
