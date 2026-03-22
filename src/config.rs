@@ -107,6 +107,8 @@ pub struct TtsConfig {
     pub enabled: bool,
     #[serde(default = "TtsConfig::default_speak_summary")]
     pub speak_summary: bool,
+    #[serde(default = "TtsConfig::default_body_word_limit")]
+    pub body_word_limit: u32,
     #[serde(default)]
     pub voice: String,
     #[serde(default)]
@@ -116,6 +118,7 @@ pub struct TtsConfig {
 impl TtsConfig {
     fn default_enabled() -> bool { true }
     fn default_speak_summary() -> bool { true }
+    fn default_body_word_limit() -> u32 { 15 }
 }
 
 impl Default for TtsConfig {
@@ -123,6 +126,7 @@ impl Default for TtsConfig {
         Self {
             enabled: Self::default_enabled(),
             speak_summary: Self::default_speak_summary(),
+            body_word_limit: Self::default_body_word_limit(),
             voice: String::new(),
             rate: 0,
         }
@@ -241,6 +245,7 @@ mod tests {
         assert!((cfg.sound.volume - 0.8).abs() < 0.001);
         assert!(cfg.tts.enabled);
         assert!(cfg.tts.speak_summary);
+        assert_eq!(cfg.tts.body_word_limit, 15);
         assert_eq!(cfg.tts.rate, 0);
         assert_eq!(cfg.actions.picker, "rofi -dmenu -p 'Action:'");
     }

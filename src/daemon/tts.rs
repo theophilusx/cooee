@@ -72,6 +72,7 @@ mod tests {
         TtsConfig {
             enabled: false,
             speak_summary: true,
+            body_word_limit: 15,
             voice: String::new(),
             rate: 0,
         }
@@ -81,6 +82,7 @@ mod tests {
         TtsConfig {
             enabled: true,
             speak_summary: false,
+            body_word_limit: 15,
             voice: String::new(),
             rate: 0,
         }
