@@ -45,15 +45,17 @@ pub fn pick_action(picker_cmd: &str, actions: &[Action]) -> Result<Action> {
         .ok_or_else(|| anyhow::anyhow!("picker returned unknown label: '{}'", selected))
 }
 
-/// Minimal shell word splitter: splits on spaces, respects single quotes.
+/// Minimal shell word splitter: splits on spaces, respects single and double quotes.
 fn shell_words(s: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut current = String::new();
     let mut in_single_quote = false;
+    let mut in_double_quote = false;
     for ch in s.chars() {
         match ch {
-            '\'' => in_single_quote = !in_single_quote,
-            ' ' if !in_single_quote => {
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            ' ' if !in_single_quote && !in_double_quote => {
                 if !current.is_empty() {
                     words.push(current.clone());
                     current.clear();
@@ -116,5 +118,21 @@ mod tests {
     #[test]
     fn test_shell_words_empty() {
         assert!(shell_words("").is_empty());
+    }
+
+    #[test]
+    fn test_shell_words_double_quoted() {
+        assert_eq!(
+            shell_words(r#"wofi --prompt "Select action:""#),
+            vec!["wofi", "--prompt", "Select action:"]
+        );
+    }
+
+    #[test]
+    fn test_shell_words_double_quoted_with_spaces() {
+        assert_eq!(
+            shell_words(r#"rofi -dmenu -p "Pick an action:""#),
+            vec!["rofi", "-dmenu", "-p", "Pick an action:"]
+        );
     }
 }
