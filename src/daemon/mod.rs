@@ -177,6 +177,10 @@ async fn handle_command(
             }
         }
         Command::Dnd { mode } => {
+            if mode.as_str() == "status" {
+                let s = state.lock().unwrap();
+                return Response::ok_dnd(s.dnd_mode_str());
+            }
             let mut s = state.lock().unwrap();
             match mode.as_str() {
                 "off" => s.set_dnd(DndMode::Off),
