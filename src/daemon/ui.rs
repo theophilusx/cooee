@@ -4,6 +4,7 @@ use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use crate::config::{Config, Position};
 use crate::notification::Notification;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 
 /// Events sent from the async runtime into the GTK main loop
 #[derive(Debug)]
@@ -18,11 +19,12 @@ pub enum UiEvent {
 pub struct NotificationManager {
     config: Arc<Config>,
     windows: Vec<(u32, ApplicationWindow)>,
+    action_tx: mpsc::UnboundedSender<(u32, String)>,
 }
 
 impl NotificationManager {
-    pub fn new(config: Arc<Config>) -> Self {
-        Self { config, windows: Vec::new() }
+    pub fn new(config: Arc<Config>, action_tx: mpsc::UnboundedSender<(u32, String)>) -> Self {
+        Self { config, windows: Vec::new(), action_tx }
     }
 
     pub fn show(&mut self, app: &Application, notification: Notification) {
@@ -33,7 +35,7 @@ impl NotificationManager {
             }
             self.windows.remove(0);
         }
-        let win = build_notification_window(app, &notification, &self.config);
+        let win = build_notification_window(app, &notification, &self.config, self.action_tx.clone());
         self.position_window(&win, self.windows.len());
         win.present();
         self.windows.push((notification.id, win));
@@ -128,6 +130,7 @@ fn build_notification_window(
     app: &Application,
     notification: &Notification,
     config: &Config,
+    action_tx: mpsc::UnboundedSender<(u32, String)>,
 ) -> ApplicationWindow {
     let win = ApplicationWindow::new(app);
     win.init_layer_shell();
@@ -194,9 +197,9 @@ fn build_notification_window(
             btn.add_css_class("notification-action-btn");
             let key = action.key.clone();
             let nid = notification.id;
+            let tx = action_tx.clone();
             btn.connect_clicked(move |_| {
-                eprintln!("cooee: action '{}' invoked on notification {}", key, nid);
-                // TODO(Task 12): emit ActionInvoked via D-Bus channel
+                let _ = tx.send((nid, key.clone()));
             });
             action_box.append(&btn);
         }

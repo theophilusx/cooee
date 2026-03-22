@@ -34,6 +34,7 @@ pub fn run() -> Result<()> {
     // Channel: socket Action handler → D-Bus ActionInvoked emitter
     let (action_tx, action_rx) = mpsc::unbounded_channel::<(u32, String)>();
     let action_tx_for_socket = action_tx.clone();
+    let action_tx_for_gtk = action_tx.clone();
 
     // Shared queue: tokio threads push events; glib idle handler drains them in the GTK thread.
     let event_queue: EventQueue = Arc::new(Mutex::new(VecDeque::new()));
@@ -91,7 +92,7 @@ pub fn run() -> Result<()> {
     let config_for_gtk = config.clone();
 
     app.connect_activate(move |app| {
-        let manager = Arc::new(Mutex::new(NotificationManager::new(config_for_gtk.clone())));
+        let manager = Arc::new(Mutex::new(NotificationManager::new(config_for_gtk.clone(), action_tx_for_gtk.clone())));
         let app_clone = app.clone();
         let queue = event_queue.clone();
 
