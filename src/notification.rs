@@ -86,7 +86,8 @@ impl Notification {
         match self.expire_timeout {
             -1 => None,
             0 => Some(default_ms),
-            n => Some(n as u32),
+            n if n > 0 => Some(n as u32),
+            _ => Some(default_ms), // unexpected negative → use server default
         }
     }
 }

@@ -18,7 +18,7 @@ impl Default for Position {
     fn default() -> Self { Position::TopRight }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DndMode {
     Off,
@@ -76,6 +76,7 @@ impl Default for GeneralConfig {
 pub struct SoundConfig {
     #[serde(default = "SoundConfig::default_enabled")]
     pub enabled: bool,
+    /// Raw path string; callers must pass through `Config::expand_path` before use.
     #[serde(default = "SoundConfig::default_file")]
     pub file: String,
     #[serde(default = "SoundConfig::default_volume")]
@@ -218,7 +219,11 @@ pub fn config_path() -> PathBuf {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    // Serialise tests that mutate environment variables to prevent data races.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_default_config_has_expected_values() {
@@ -251,6 +256,7 @@ margin_x = 32
 
     #[test]
     fn test_expand_path_replaces_tilde() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("HOME", "/home/testuser");
         let p = Config::expand_path("~/.config/cooee/sounds/notify.ogg");
         assert_eq!(p.to_str().unwrap(), "/home/testuser/.config/cooee/sounds/notify.ogg");

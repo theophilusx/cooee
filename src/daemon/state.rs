@@ -20,7 +20,8 @@ impl AppState {
 
     pub fn next_notification_id(&mut self) -> u32 {
         let id = self.next_id;
-        self.next_id += 1;
+        // wrapping_add then max(1) ensures we never hand out ID 0 (reserved by spec)
+        self.next_id = self.next_id.wrapping_add(1).max(1);
         id
     }
 
