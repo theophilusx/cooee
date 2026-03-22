@@ -1,0 +1,15 @@
+[Unit]
+Description=cooee notification daemon
+Documentation=https://github.com/theophilusx/cooee
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/cooee daemon
+Restart=on-failure
+RestartSec=2
+Type=dbus
+BusName=org.freedesktop.Notifications
+
+[Install]
+WantedBy=graphical-session.target
