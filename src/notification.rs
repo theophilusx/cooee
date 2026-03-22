@@ -80,14 +80,16 @@ impl Notification {
         }
     }
 
-    /// Effective display duration in ms. Returns `default_ms` when expire_timeout == 0,
-    /// and `None` (persistent) when expire_timeout == -1.
+    /// Effective display duration in ms.
+    ///
+    /// Both `0` and `-1` map to `default_ms`. Although the FDO spec assigns different
+    /// meanings to these two values, libnotify (used by virtually every app) sends `-1`
+    /// to mean "use the server's default timeout", so treating `-1` as persistent would
+    /// cause most notifications to never auto-close. This matches dunst/mako behaviour.
     pub fn display_duration_ms(&self, default_ms: u32) -> Option<u32> {
         match self.expire_timeout {
-            -1 => None,
-            0 => Some(default_ms),
-            n if n > 0 => Some(n as u32),
-            _ => Some(default_ms), // unexpected negative → use server default
+            n if n <= 0 => Some(default_ms),
+            n => Some(n as u32),
         }
     }
 }
@@ -138,9 +140,10 @@ mod tests {
     }
 
     #[test]
-    fn test_display_duration_persistent() {
+    fn test_display_duration_negative_one_uses_default() {
+        // libnotify sends -1 to mean "use server default" — must not be treated as persistent
         let n = make_notification(-1);
-        assert_eq!(n.display_duration_ms(5000), None);
+        assert_eq!(n.display_duration_ms(5000), Some(5000));
     }
 
     #[test]
