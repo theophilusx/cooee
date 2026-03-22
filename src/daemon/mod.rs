@@ -52,8 +52,6 @@ pub fn run() -> Result<()> {
                 let mut rx = ui_rx;
                 while let Some(event) = rx.recv().await {
                     queue_bridge.lock().unwrap().push_back(event);
-                    // Wake the GTK main loop via idle_add
-                    gtk4::glib::idle_add_once(|| {});
                 }
             });
 
@@ -62,7 +60,6 @@ pub fn run() -> Result<()> {
                 state_for_tokio.clone(),
                 config_for_tokio.clone(),
                 ui_tx,
-                action_tx,
             ).await {
                 Ok(c) => c,
                 Err(e) => {
@@ -193,7 +190,6 @@ async fn handle_command(
         }
         Command::Dismiss => {
             event_queue.lock().unwrap().push_back(UiEvent::DismissLatest);
-            gtk4::glib::idle_add_once(|| {});
             Response::ok()
         }
         Command::Action => {

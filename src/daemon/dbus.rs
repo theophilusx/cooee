@@ -12,7 +12,6 @@ pub struct NotificationServer {
     state: SharedState,
     config: Arc<Config>,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
-    action_tx: mpsc::UnboundedSender<(u32, String)>, // TODO(Task 12): used when ActionInvoked is wired
 }
 
 #[interface(name = "org.freedesktop.Notifications")]
@@ -121,9 +120,8 @@ pub async fn start_dbus_server(
     state: SharedState,
     config: Arc<Config>,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
-    action_tx: mpsc::UnboundedSender<(u32, String)>,
 ) -> Result<Connection> {
-    let server = NotificationServer { state, config, ui_tx, action_tx };
+    let server = NotificationServer { state, config, ui_tx };
     let conn = zbus::ConnectionBuilder::session()?
         .name("org.freedesktop.Notifications")?
         .serve_at("/org/freedesktop/Notifications", server)?
