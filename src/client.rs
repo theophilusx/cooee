@@ -1,9 +1,25 @@
 use anyhow::{bail, Result};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
-use crate::daemon::socket::{Command as SocketCommand, socket_path};
+use crate::daemon::socket::{Command as SocketCommand, Response as SocketResponse, socket_path};
 
 pub fn run(cmd: crate::Command) -> Result<()> {
+    if let crate::Command::History { last } = cmd {
+        let socket_cmd = SocketCommand::History { count: last };
+        let resp = send_command(&socket_cmd)?;
+        if !resp.ok {
+            let err = resp.error.as_deref().unwrap_or("unknown error");
+            eprintln!("cooee: {}", err);
+            std::process::exit(1);
+        }
+        for n in resp.history.unwrap_or_default() {
+            let time = n.received_at.format("%H:%M:%S");
+            let urgency = n.urgency; // Urgency type, has Display
+            println!("[{time}] {:<14} ({urgency:<8}) {}", n.app_name, n.summary);
+        }
+        return Ok(());
+    }
+
     let socket_cmd = translate_command(cmd)?;
     let path = socket_path();
     let mut stream = UnixStream::connect(&path)
@@ -32,6 +48,20 @@ pub fn run(cmd: crate::Command) -> Result<()> {
     Ok(())
 }
 
+fn send_command(socket_cmd: &SocketCommand) -> Result<SocketResponse> {
+    let path = socket_path();
+    let mut stream = UnixStream::connect(&path)
+        .map_err(|_| anyhow::anyhow!("cooee daemon is not running (could not connect to {:?})", path))?;
+    let mut line = serde_json::to_string(socket_cmd)?;
+    line.push('\n');
+    stream.write_all(line.as_bytes())?;
+    let mut reader = BufReader::new(&stream);
+    let mut response_line = String::new();
+    reader.read_line(&mut response_line)?;
+    let resp: SocketResponse = serde_json::from_str(response_line.trim())?;
+    Ok(resp)
+}
+
 fn translate_command(cmd: crate::Command) -> Result<SocketCommand> {
     Ok(match cmd {
         crate::Command::Speak => SocketCommand::Speak,
@@ -43,5 +73,6 @@ fn translate_command(cmd: crate::Command) -> Result<SocketCommand> {
         crate::Command::Action => SocketCommand::Action,
         crate::Command::Status => SocketCommand::Status,
         crate::Command::Daemon => bail!("translate_command called with Daemon variant"),
+        crate::Command::History { .. } => bail!("translate_command called with History variant"),
     })
 }

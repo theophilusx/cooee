@@ -22,4 +22,9 @@ pub enum Command {
     Action,
     /// Print daemon status
     Status,
+    /// Print notification history
+    History {
+        #[arg(long, value_name = "N", help = "Show only the N most recent entries")]
+        last: Option<usize>,
+    },
 }
