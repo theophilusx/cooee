@@ -84,7 +84,13 @@ pub fn run() -> Result<()> {
                 tokio::task::spawn_blocking(move || {
                     use notify::Watcher;
                     let (tx, rx) = std::sync::mpsc::channel();
-                    let mut watcher = notify::recommended_watcher(tx).expect("watcher");
+                    let mut watcher = match notify::recommended_watcher(tx) {
+                        Ok(w) => w,
+                        Err(e) => {
+                            eprintln!("cooee: config watcher unavailable: {e}");
+                            return;
+                        }
+                    };
                     watcher.watch(&Config::config_path(), notify::RecursiveMode::NonRecursive).ok();
                     loop {
                         match rx.recv() {
