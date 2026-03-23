@@ -83,6 +83,7 @@ impl NotificationServer {
             image_data, image_path, replaces_id,
         );
         state.last_notification = Some(notification.clone());
+        state.push_history(notification.clone());
         let is_silent = matches!(state.dnd_mode, DndMode::Silent);
         drop(state);
 
