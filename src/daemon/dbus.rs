@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use zbus::{interface, Connection, SignalContext};
-use crate::notification::Notification;
+use crate::notification::{Notification, ImageData};
 use crate::config::{Config, DndMode};
 use crate::daemon::state::SharedState;
 use crate::daemon::ui::UiEvent;
@@ -33,6 +33,32 @@ impl NotificationServer {
             .and_then(|v| u8::try_from(v).ok())
             .unwrap_or(1);
 
+        let image_data = hints.get("image-data").and_then(|v| {
+            let owned = v.try_clone().ok()?;
+            let s = zbus::zvariant::Structure::try_from(owned).ok()?;
+            let fields = s.fields();
+            let width = i32::try_from(&fields[0]).ok()?;
+            let height = i32::try_from(&fields[1]).ok()?;
+            let rowstride = i32::try_from(&fields[2]).ok()?;
+            let has_alpha = bool::try_from(&fields[3]).ok()?;
+            let bits_per_sample = i32::try_from(&fields[4]).ok()?;
+            let n_channels = i32::try_from(&fields[5]).ok()?;
+            let data: Vec<u8> = zbus::zvariant::Array::try_from(fields[6].try_clone().ok()?)
+                .ok()?
+                .iter()
+                .filter_map(|b| u8::try_from(b).ok())
+                .collect();
+            Some(ImageData { width, height, rowstride, has_alpha, bits_per_sample, n_channels, data })
+        });
+
+        let image_path = if image_data.is_none() {
+            hints.get("image-path")
+                .and_then(|v| v.try_clone().ok())
+                .and_then(|v| String::try_from(v).ok())
+        } else {
+            None
+        };
+
         // Check DND Full — discard the notification but still emit NotificationClosed
         let dnd_full_id = {
             let mut state = self.state.lock().unwrap();
@@ -52,7 +78,7 @@ impl NotificationServer {
         let id = if replaces_id > 0 { replaces_id } else { state.next_notification_id() };
         let notification = Notification::new(
             id, app_name, app_icon, summary, body, actions, urgency, expire_timeout,
-            None, None, replaces_id,
+            image_data, image_path, replaces_id,
         );
         state.last_notification = Some(notification.clone());
         let is_silent = matches!(state.dnd_mode, DndMode::Silent);

@@ -253,8 +253,35 @@ fn build_body(notification: &Notification) -> Option<Label> {
     Some(body)
 }
 
-fn build_image(_notification: &Notification) -> Option<gtk4::Image> {
-    // Image hint implementation is in Task 4
+fn build_image(notification: &Notification) -> Option<gtk4::Image> {
+    if let Some(d) = &notification.image_data {
+        let format = if d.has_alpha {
+            gtk4::gdk::MemoryFormat::R8g8b8a8
+        } else {
+            gtk4::gdk::MemoryFormat::R8g8b8
+        };
+        let texture = gtk4::gdk::MemoryTexture::new(
+            d.width,
+            d.height,
+            format,
+            &gtk4::glib::Bytes::from(&d.data),
+            d.rowstride as usize,
+        );
+        let image = gtk4::Image::from_paintable(Some(&texture));
+        image.add_css_class("notification-image");
+        return Some(image);
+    }
+
+    if let Some(p) = &notification.image_path {
+        let image = if p.starts_with('/') || p.starts_with("file://") {
+            gtk4::Image::from_file(p)
+        } else {
+            gtk4::Image::from_icon_name(p)
+        };
+        image.add_css_class("notification-image");
+        return Some(image);
+    }
+
     None
 }
 
