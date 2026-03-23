@@ -36,7 +36,6 @@ pub fn build_css(config: &Config) -> String {
     padding: 0 4px;
     min-width: 0;
     min-height: 0;
-    margin-left: auto;
     font-size: {fs}px;
 }}
 .notification-dismiss:hover {{
@@ -244,10 +243,11 @@ fn build_header(notification: &Notification, config: &GeneralConfig, win: &Appli
         hbox.append(&icon);
     }
 
-    // Summary label
+    // Summary label — hexpand pushes the dismiss button to the right
     let summary = Label::new(Some(&notification.summary));
     summary.add_css_class("notification-summary");
     summary.set_xalign(0.0);
+    summary.set_hexpand(true);
     hbox.append(&summary);
 
     // Dismiss button
