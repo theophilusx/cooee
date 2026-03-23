@@ -5,7 +5,7 @@ use std::path::PathBuf;
 macro_rules! default_val {
     ($name:ident, $ty:ty, $val:expr) => {
         fn $name() -> $ty { $val }
-    }
+    };
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
