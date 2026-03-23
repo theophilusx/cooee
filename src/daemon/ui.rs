@@ -191,7 +191,7 @@ impl NotificationManager {
     }
 }
 
-fn setup_layer_shell(win: &ApplicationWindow, config: &Config) {
+fn setup_layer_shell(win: &ApplicationWindow) {
     win.init_layer_shell();
     win.set_layer(Layer::Overlay);
     win.set_namespace(Some("cooee"));
@@ -215,7 +215,8 @@ fn setup_layer_shell(win: &ApplicationWindow, config: &Config) {
     }
 }
 
-fn build_header(notification: &Notification, config: &Config, win: ApplicationWindow) -> GtkBox {
+fn build_header(notification: &Notification, config: &Config, win: &ApplicationWindow) -> GtkBox {
+    let win = win.clone();
     let hbox = GtkBox::new(Orientation::Horizontal, 8);
 
     // App icon
@@ -284,7 +285,7 @@ fn setup_auto_dismiss(win: &ApplicationWindow, notification: &Notification, conf
     if let Some(ms) = notification.display_duration_ms(config.general.timeout) {
         let win = win.clone();
         gtk4::glib::timeout_add_local_once(
-            std::time::Duration::from_millis(ms as u64),
+            std::time::Duration::from_millis(u64::from(ms)),
             move || win.destroy(),
         );
     }
@@ -298,12 +299,12 @@ fn build_notification_window(
 ) -> ApplicationWindow {
     let win = ApplicationWindow::new(app);
 
-    setup_layer_shell(&win, config);
+    setup_layer_shell(&win);
 
     let vbox = GtkBox::new(Orientation::Vertical, 8);
     vbox.add_css_class("notification-card");
 
-    let header = build_header(notification, config, win.clone());
+    let header = build_header(notification, config, &win);
     vbox.append(&header);
 
     if let Some(image) = build_image(notification) {
