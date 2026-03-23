@@ -159,7 +159,38 @@ picker = "rofi -dmenu -p 'Action:'"
                          # cooee writes one action label per line to stdin
                          # the selected label is read from stdout
                          # other compatible pickers: "wofi --dmenu", "fzf"
+
+[history]
+max_entries = 50         # number of notifications to keep in memory
+                         # 0 = history disabled
+                         # history is in-memory only; cleared when the daemon restarts
 ```
+
+### Styling
+
+`~/.config/cooee/style.css` is written on first run with the default styles. Edit it to customise the appearance of notification cards — changes take effect immediately without restarting the daemon.
+
+The default stylesheet defines these CSS classes:
+
+| Class | Element |
+|---|---|
+| `.notification-card` | Outer card (background, border, padding, font) |
+| `.notification-summary` | Title line |
+| `.notification-body` | Body text |
+| `.notification-dismiss` | × dismiss button |
+| `.notification-actions` | Action button row container |
+| `.notification-action-btn` | Individual action button |
+| `.notification-image` | Content image (from `image-data` / `image-path` hints) |
+
+Example — change the card background to a dark blue tint:
+
+```css
+.notification-card {
+    background-color: rgba(10, 20, 50, 0.95);
+}
+```
+
+To restore the defaults, delete `style.css` and restart the daemon — it will be regenerated.
 
 ### Do Not Disturb modes
 
@@ -181,6 +212,7 @@ Toggle with `cooee dnd toggle` (cycles: off → silent → full → off).
 | `cooee dismiss` | Dismiss the most recently received popup |
 | `cooee action` | Open the action picker for the last notification |
 | `cooee status` | Print daemon status and current DND mode |
+| `cooee history [--last N]` | Print notification history (newest first); `--last N` limits to N entries |
 
 ## Troubleshooting
 
