@@ -156,11 +156,16 @@ mod tests {
         let mut state = AppState::new(DndMode::Off, 50);
         state.push_history(make_notif(1, 0));
         state.push_history(make_notif(2, 0));
-        let replacement = make_notif(1, 1); // replaces_id=1
+        // Push a replacement for id=1 with a distinct summary
+        let replacement = Notification::new(
+            1, "app1".into(), "".into(), "updated summary".into(), "".into(),
+            vec![], 1, 0, None, None, 1, // replaces_id=1
+        );
         state.push_history(replacement);
+        // Still 2 entries; id=1 replaced in-place at position 0
         assert_eq!(state.history.len(), 2);
         assert_eq!(state.history[0].id, 1);
-        assert_eq!(state.history[0].summary, "summary 1");
+        assert_eq!(state.history[0].summary, "updated summary"); // content actually updated
     }
 
     #[test]
