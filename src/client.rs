@@ -14,7 +14,7 @@ pub fn run(cmd: crate::Command) -> Result<()> {
         }
         for n in resp.history.unwrap_or_default() {
             let time = n.received_at.format("%H:%M:%S");
-            let urgency = n.urgency; // Urgency type, has Display
+            let urgency = n.urgency;
             println!("[{time}] {:<14} ({urgency:<8}) {}", n.app_name, n.summary);
         }
         return Ok(());
