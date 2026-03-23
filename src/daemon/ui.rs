@@ -191,13 +191,7 @@ impl NotificationManager {
     }
 }
 
-fn build_notification_window(
-    app: &Application,
-    notification: &Notification,
-    config: &Config,
-    action_tx: mpsc::UnboundedSender<(u32, String)>,
-) -> ApplicationWindow {
-    let win = ApplicationWindow::new(app);
+fn setup_layer_shell(win: &ApplicationWindow, config: &Config) {
     win.init_layer_shell();
     win.set_layer(Layer::Overlay);
     win.set_namespace(Some("cooee"));
@@ -219,17 +213,19 @@ fn build_notification_window(
             }
         }
     }
+}
 
-    let vbox = GtkBox::new(Orientation::Vertical, 8);
-    vbox.add_css_class("notification-card");
-
-    // Header row: icon + summary
+fn build_header(notification: &Notification, config: &Config, win: ApplicationWindow) -> GtkBox {
     let hbox = GtkBox::new(Orientation::Horizontal, 8);
+
+    // App icon
     if !notification.app_icon.is_empty() {
         let icon = gtk4::Image::from_icon_name(&notification.app_icon);
         icon.set_pixel_size(config.general.icon_size);
         hbox.append(&icon);
     }
+
+    // Summary label
     let summary = Label::new(Some(&notification.summary));
     summary.add_css_class("notification-summary");
     summary.set_xalign(0.0);
@@ -239,50 +235,93 @@ fn build_notification_window(
     let dismiss_btn = Button::with_label("×");
     dismiss_btn.add_css_class("notification-dismiss");
     hbox.append(&dismiss_btn);
-    let win_ref = win.clone();
-    dismiss_btn.connect_clicked(move |_| win_ref.destroy());
-    vbox.append(&hbox);
+    dismiss_btn.connect_clicked(move |_| win.destroy());
 
-    // Body text (supports Pango markup)
-    if !notification.body.is_empty() {
-        let body = Label::new(None);
-        body.set_markup(&notification.body);
-        body.set_wrap(true);
-        body.set_xalign(0.0);
-        body.add_css_class("notification-body");
+    hbox
+}
+
+fn build_body(notification: &Notification) -> Option<Label> {
+    if notification.body.is_empty() {
+        return None;
+    }
+    let body = Label::new(None);
+    body.set_markup(&notification.body);
+    body.set_wrap(true);
+    body.set_xalign(0.0);
+    body.add_css_class("notification-body");
+    Some(body)
+}
+
+fn build_image(_notification: &Notification) -> Option<gtk4::Image> {
+    // Image hint implementation is in Task 4
+    None
+}
+
+fn build_actions(
+    notification: &Notification,
+    action_tx: mpsc::UnboundedSender<(u32, String)>,
+) -> Option<GtkBox> {
+    if notification.actions.is_empty() {
+        return None;
+    }
+    let action_box = GtkBox::new(Orientation::Horizontal, 4);
+    action_box.add_css_class("notification-actions");
+    for action in &notification.actions {
+        let btn = Button::with_label(&action.label);
+        btn.add_css_class("notification-action-btn");
+        let key = action.key.clone();
+        let nid = notification.id;
+        let tx = action_tx.clone();
+        btn.connect_clicked(move |_| {
+            let _ = tx.send((nid, key.clone()));
+        });
+        action_box.append(&btn);
+    }
+    Some(action_box)
+}
+
+fn setup_auto_dismiss(win: &ApplicationWindow, notification: &Notification, config: &Config) {
+    if let Some(ms) = notification.display_duration_ms(config.general.timeout) {
+        let win = win.clone();
+        gtk4::glib::timeout_add_local_once(
+            std::time::Duration::from_millis(ms as u64),
+            move || win.destroy(),
+        );
+    }
+}
+
+fn build_notification_window(
+    app: &Application,
+    notification: &Notification,
+    config: &Config,
+    action_tx: mpsc::UnboundedSender<(u32, String)>,
+) -> ApplicationWindow {
+    let win = ApplicationWindow::new(app);
+
+    setup_layer_shell(&win, config);
+
+    let vbox = GtkBox::new(Orientation::Vertical, 8);
+    vbox.add_css_class("notification-card");
+
+    let header = build_header(notification, config, win.clone());
+    vbox.append(&header);
+
+    if let Some(image) = build_image(notification) {
+        vbox.append(&image);
+    }
+
+    if let Some(body) = build_body(notification) {
         vbox.append(&body);
     }
 
-    // Action buttons
-    if !notification.actions.is_empty() {
-        let action_box = GtkBox::new(Orientation::Horizontal, 4);
-        action_box.add_css_class("notification-actions");
-        for action in &notification.actions {
-            let btn = Button::with_label(&action.label);
-            btn.add_css_class("notification-action-btn");
-            let key = action.key.clone();
-            let nid = notification.id;
-            let tx = action_tx.clone();
-            btn.connect_clicked(move |_| {
-                let _ = tx.send((nid, key.clone()));
-            });
-            action_box.append(&btn);
-        }
-        vbox.append(&action_box);
+    if let Some(actions) = build_actions(notification, action_tx) {
+        vbox.append(&actions);
     }
 
     win.set_child(Some(&vbox));
     win.set_default_width(config.general.width);
 
-    // Auto-dismiss timer
-    let win_clone = win.clone();
-    let timeout_ms = notification.display_duration_ms(config.general.timeout);
-    if let Some(ms) = timeout_ms {
-        gtk4::glib::timeout_add_local_once(
-            std::time::Duration::from_millis(ms as u64),
-            move || win_clone.destroy(),
-        );
-    }
+    setup_auto_dismiss(&win, notification, config);
 
     win
 }
