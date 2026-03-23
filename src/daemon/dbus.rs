@@ -37,6 +37,7 @@ impl NotificationServer {
             let owned = v.try_clone().ok()?;
             let s = zbus::zvariant::Structure::try_from(owned).ok()?;
             let fields = s.fields();
+            if fields.len() < 7 { return None; }
             let width = i32::try_from(&fields[0]).ok()?;
             let height = i32::try_from(&fields[1]).ok()?;
             let rowstride = i32::try_from(&fields[2]).ok()?;
@@ -48,6 +49,8 @@ impl NotificationServer {
                 .iter()
                 .filter_map(|b| u8::try_from(b).ok())
                 .collect();
+            if bits_per_sample != 8 { return None; }
+            if n_channels < 3 || n_channels > 4 { return None; }
             Some(ImageData { width, height, rowstride, has_alpha, bits_per_sample, n_channels, data })
         });
 

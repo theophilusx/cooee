@@ -255,6 +255,8 @@ fn build_body(notification: &Notification) -> Option<Label> {
 
 fn build_image(notification: &Notification) -> Option<gtk4::Image> {
     if let Some(d) = &notification.image_data {
+        if d.rowstride <= 0 { return None; }
+        let stride = d.rowstride as usize;
         let format = if d.has_alpha {
             gtk4::gdk::MemoryFormat::R8g8b8a8
         } else {
@@ -265,7 +267,7 @@ fn build_image(notification: &Notification) -> Option<gtk4::Image> {
             d.height,
             format,
             &gtk4::glib::Bytes::from(&d.data),
-            d.rowstride as usize,
+            stride,
         );
         let image = gtk4::Image::from_paintable(Some(&texture));
         image.add_css_class("notification-image");
@@ -273,8 +275,10 @@ fn build_image(notification: &Notification) -> Option<gtk4::Image> {
     }
 
     if let Some(p) = &notification.image_path {
-        let image = if p.starts_with('/') || p.starts_with("file://") {
+        let image = if p.starts_with('/') {
             gtk4::Image::from_file(p)
+        } else if p.starts_with("file://") {
+            gtk4::Image::from_file(&p["file://".len()..])
         } else {
             gtk4::Image::from_icon_name(p)
         };
