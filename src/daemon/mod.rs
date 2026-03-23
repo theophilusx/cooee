@@ -27,7 +27,8 @@ pub fn run() -> Result<()> {
     let config = Config::load()?.shared();
 
     let initial_dnd = config.read().unwrap().dnd.mode.clone();
-    let shared_state = new_shared_state(initial_dnd);
+    let history_max = config.read().unwrap().history.max_entries;
+    let shared_state = new_shared_state(initial_dnd, history_max);
 
     // Channel: D-Bus server → tokio bridge task → glib main loop
     let (ui_tx, ui_rx) = mpsc::unbounded_channel::<UiEvent>();
