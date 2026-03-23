@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 
 use crate::config::{Config, DndMode, SharedConfig};
 use crate::daemon::state::new_shared_state;
-use crate::daemon::ui::{NotificationManager, UiEvent};
+use crate::daemon::ui::{build_css, NotificationManager, UiEvent};
 
 const APP_ID: &str = "org.theophilusx.cooee";
 
@@ -25,6 +25,12 @@ type EventQueue = Arc<Mutex<VecDeque<UiEvent>>>;
 
 pub fn run() -> Result<()> {
     let config = Config::load()?.shared();
+
+    // Write ~/.config/cooee/style.css on first run so users can customise it.
+    let default_css = build_css(&config.read().unwrap());
+    if let Err(e) = Config::ensure_default_style(&default_css) {
+        eprintln!("cooee: could not write default style.css: {e}");
+    }
 
     let initial_dnd = config.read().unwrap().dnd.mode.clone();
     let history_max = config.read().unwrap().history.max_entries;
@@ -93,15 +99,22 @@ pub fn run() -> Result<()> {
                         }
                     };
                     watcher.watch(&Config::config_path(), notify::RecursiveMode::NonRecursive).ok();
+                    watcher.watch(&Config::style_path(), notify::RecursiveMode::NonRecursive).ok();
+                    let style_path = Config::style_path();
                     loop {
                         match rx.recv() {
                             Ok(Ok(event)) if matches!(event.kind, notify::EventKind::Modify(_)) => {
-                                match Config::load() {
-                                    Ok(new_cfg) => {
-                                        *shared_config.write().unwrap() = new_cfg;
-                                        event_queue.lock().unwrap().push_back(UiEvent::ReloadCss);
+                                if event.paths.iter().any(|p| p == &style_path) {
+                                    // Style file changed — just refresh CSS, no config reload needed.
+                                    event_queue.lock().unwrap().push_back(UiEvent::ReloadCss);
+                                } else {
+                                    match Config::load() {
+                                        Ok(new_cfg) => {
+                                            *shared_config.write().unwrap() = new_cfg;
+                                            event_queue.lock().unwrap().push_back(UiEvent::ReloadCss);
+                                        }
+                                        Err(e) => eprintln!("cooee: config reload failed: {e}"),
                                     }
-                                    Err(e) => eprintln!("cooee: config reload failed: {e}"),
                                 }
                             }
                             _ => {}

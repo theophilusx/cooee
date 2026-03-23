@@ -94,10 +94,8 @@ impl NotificationManager {
     /// On subsequent calls (e.g. hot-reload), updates the existing provider rather than
     /// registering a new one, preventing provider accumulation.
     pub fn init_css(&self) {
-        let css = {
-            let cfg = self.config.read().unwrap();
-            build_css(&cfg)
-        };
+        let css = std::fs::read_to_string(Config::style_path())
+            .unwrap_or_else(|_| build_css(&self.config.read().unwrap()));
         self.css_provider.load_from_string(&css);
     }
 

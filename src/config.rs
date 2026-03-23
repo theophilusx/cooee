@@ -205,6 +205,30 @@ impl Config {
         config_path()
     }
 
+    pub fn style_path() -> PathBuf {
+        let base = std::env::var("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                dirs_next_home()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join(".config")
+            });
+        base.join("cooee").join("style.css")
+    }
+
+    /// Write `css` to `style_path()` only if the file does not yet exist.
+    pub fn ensure_default_style(css: &str) -> Result<()> {
+        let path = Self::style_path();
+        if path.exists() {
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&path, css)?;
+        Ok(())
+    }
+
     pub fn load() -> Result<Self> {
         let path = config_path();
         if !path.exists() {
