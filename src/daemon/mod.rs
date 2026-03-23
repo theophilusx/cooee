@@ -9,7 +9,7 @@ pub mod action_picker;
 
 use anyhow::Result;
 use gtk4::prelude::*;
-use gtk4::Application;
+use gtk4::{gio, Application};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -36,7 +36,7 @@ pub fn run() -> Result<()> {
     let action_tx_for_socket = action_tx.clone();
     let action_tx_for_gtk = action_tx.clone();
 
-    // Shared queue: tokio threads push events; glib idle handler drains them in the GTK thread.
+    // Shared queue: tokio threads push events; glib timer handler drains them in the GTK thread.
     let event_queue: EventQueue = Arc::new(Mutex::new(VecDeque::new()));
     let event_queue_for_tokio = event_queue.clone();
     let event_queue_for_socket = event_queue.clone();
@@ -87,9 +87,17 @@ pub fn run() -> Result<()> {
         });
     });
 
-    // Start GTK application
+    // Start GTK application.
     let app = Application::builder().application_id(APP_ID).build();
     let config_for_gtk = config.clone();
+
+    // Permanently hold the application — it must never auto-quit between notifications.
+    // The guard must be stored; dropping it would release the hold immediately (RAII).
+    let hold_guard = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let hold_guard_for_startup = hold_guard.clone();
+    app.connect_startup(move |app| {
+        *hold_guard_for_startup.borrow_mut() = Some(app.hold());
+    });
 
     app.connect_activate(move |app| {
         let mgr_instance = NotificationManager::new(config_for_gtk.clone(), action_tx_for_gtk.clone());
@@ -98,23 +106,28 @@ pub fn run() -> Result<()> {
         let app_clone = app.clone();
         let queue = event_queue.clone();
 
-        // Install an idle handler that drains the event queue each time it runs.
-        gtk4::glib::idle_add_local(move || {
-            let events: Vec<UiEvent> = {
-                let mut q = queue.lock().unwrap();
-                q.drain(..).collect()
-            };
-            let mut mgr = manager.lock().unwrap();
-            for event in events {
-                match event {
-                    UiEvent::ShowNotification(n) => mgr.show(&app_clone, n),
-                    UiEvent::CloseNotification(id) => mgr.close(id),
-                    UiEvent::DismissLatest => mgr.dismiss_latest(),
-                    UiEvent::Shutdown => app_clone.quit(),
+        // Poll for queued events at a fixed interval. Using timeout_add_local (not idle_add_local)
+        // avoids a busy-wait: idle_add_local with ControlFlow::Continue would spin at 100% CPU
+        // whenever the GTK main loop has no other work, whereas this fires at most 100 times/sec.
+        gtk4::glib::timeout_add_local(
+            std::time::Duration::from_millis(10),
+            move || {
+                let events: Vec<UiEvent> = {
+                    let mut q = queue.lock().unwrap();
+                    q.drain(..).collect()
+                };
+                let mut mgr = manager.lock().unwrap();
+                for event in events {
+                    match event {
+                        UiEvent::ShowNotification(n) => mgr.show(&app_clone, n),
+                        UiEvent::CloseNotification(id) => mgr.close(id),
+                        UiEvent::DismissLatest => mgr.dismiss_latest(),
+                        UiEvent::Shutdown => app_clone.quit(),
+                    }
                 }
-            }
-            gtk4::glib::ControlFlow::Continue
-        });
+                gtk4::glib::ControlFlow::Continue
+            },
+        );
     });
 
     app.run_with_args::<&str>(&[]);
