@@ -102,6 +102,9 @@ impl NotificationManager {
 
     pub fn show(&mut self, app: &Application, notification: Notification) {
         self.prune_closed();
+        if notification.replaces_id > 0 {
+            self.close(notification.replaces_id);
+        }
         // Evict oldest if at capacity
         if self.windows.len() >= self.config.general.max_visible {
             if let Some((_, win)) = self.windows.first() {
