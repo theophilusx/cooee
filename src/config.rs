@@ -185,6 +185,10 @@ impl Config {
         Arc::new(RwLock::new(self))
     }
 
+    pub fn config_path() -> std::path::PathBuf {
+        config_path()
+    }
+
     pub fn load() -> Result<Self> {
         let path = config_path();
         if !path.exists() {

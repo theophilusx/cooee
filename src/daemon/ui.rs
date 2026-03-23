@@ -67,6 +67,7 @@ pub enum UiEvent {
     CloseNotification(u32),
     DismissLatest,
     Shutdown,
+    ReloadCss,
 }
 
 /// Manages the stack of visible notification windows

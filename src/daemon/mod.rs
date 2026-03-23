@@ -77,6 +77,32 @@ pub fn run() -> Result<()> {
                 }
             });
 
+            // Watch config file for changes; reload SharedConfig and trigger CSS refresh.
+            {
+                let shared_config = config_for_tokio.clone();
+                let event_queue = event_queue_for_tokio.clone();
+                tokio::task::spawn_blocking(move || {
+                    use notify::Watcher;
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    let mut watcher = notify::recommended_watcher(tx).expect("watcher");
+                    watcher.watch(&Config::config_path(), notify::RecursiveMode::NonRecursive).ok();
+                    loop {
+                        match rx.recv() {
+                            Ok(Ok(event)) if matches!(event.kind, notify::EventKind::Modify(_)) => {
+                                match Config::load() {
+                                    Ok(new_cfg) => {
+                                        *shared_config.write().unwrap() = new_cfg;
+                                        event_queue.lock().unwrap().push_back(UiEvent::ReloadCss);
+                                    }
+                                    Err(e) => eprintln!("cooee: config reload failed: {e}"),
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                });
+            }
+
             // Start Unix socket server
             socket_server(
                 state_for_tokio,
@@ -123,6 +149,7 @@ pub fn run() -> Result<()> {
                         UiEvent::CloseNotification(id) => mgr.close(id),
                         UiEvent::DismissLatest => mgr.dismiss_latest(),
                         UiEvent::Shutdown => app_clone.quit(),
+                        UiEvent::ReloadCss => mgr.init_css(),
                     }
                 }
                 gtk4::glib::ControlFlow::Continue
