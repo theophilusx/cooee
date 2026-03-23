@@ -1,7 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{gdk, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use crate::config::{Config, Position, SharedConfig};
+use crate::config::{Config, GeneralConfig, Position, SharedConfig};
 use crate::notification::Notification;
 use tokio::sync::mpsc;
 
@@ -108,19 +108,19 @@ impl NotificationManager {
         if notification.replaces_id > 0 {
             self.close(notification.replaces_id);
         }
-        // Snapshot config fields before GTK work
-        let (max_visible, config_snapshot) = {
+        // Snapshot only the general config fields before GTK work
+        let general_snapshot = {
             let cfg = self.config.read().unwrap();
-            (cfg.general.max_visible, cfg.clone())
+            cfg.general.clone()
         };
         // Evict oldest if at capacity
-        if self.windows.len() >= max_visible {
+        if self.windows.len() >= general_snapshot.max_visible {
             if let Some((_, win)) = self.windows.first() {
                 win.destroy();
             }
             self.windows.remove(0);
         }
-        let win = build_notification_window(app, &notification, &config_snapshot, self.action_tx.clone());
+        let win = build_notification_window(app, &notification, &general_snapshot, self.action_tx.clone());
         self.position_window(&win);
         win.present();
         self.windows.push((notification.id, win));
@@ -142,62 +142,64 @@ impl NotificationManager {
     }
 
     fn position_window(&self, win: &ApplicationWindow) {
-        let config_guard = self.config.read().unwrap();
-        let cfg = &config_guard.general;
+        let (position, margin_x, margin_y) = {
+            let cfg = self.config.read().unwrap();
+            (cfg.general.position.clone(), cfg.general.margin_x, cfg.general.margin_y)
+        };
 
-        match cfg.position {
+        match position {
             Position::TopRight => {
                 win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Right, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y);
-                win.set_margin(Edge::Right, cfg.margin_x);
+                win.set_margin(Edge::Top, margin_y);
+                win.set_margin(Edge::Right, margin_x);
             }
             Position::TopLeft => {
                 win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Left, true);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y);
-                win.set_margin(Edge::Left, cfg.margin_x);
+                win.set_margin(Edge::Top, margin_y);
+                win.set_margin(Edge::Left, margin_x);
             }
             Position::BottomRight => {
                 win.set_anchor(Edge::Bottom, true);
                 win.set_anchor(Edge::Right, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y);
-                win.set_margin(Edge::Right, cfg.margin_x);
+                win.set_margin(Edge::Bottom, margin_y);
+                win.set_margin(Edge::Right, margin_x);
             }
             Position::BottomLeft => {
                 win.set_anchor(Edge::Bottom, true);
                 win.set_anchor(Edge::Left, true);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y);
-                win.set_margin(Edge::Left, cfg.margin_x);
+                win.set_margin(Edge::Bottom, margin_y);
+                win.set_margin(Edge::Left, margin_x);
             }
             Position::Center => {
                 win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Bottom, false);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
-                win.set_margin(Edge::Top, cfg.margin_y);
+                win.set_margin(Edge::Top, margin_y);
             }
             Position::CenterTop => {
                 win.set_anchor(Edge::Top, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Bottom, false);
-                win.set_margin(Edge::Top, cfg.margin_y);
+                win.set_margin(Edge::Top, margin_y);
             }
             Position::CenterBottom => {
                 win.set_anchor(Edge::Bottom, true);
                 win.set_anchor(Edge::Left, false);
                 win.set_anchor(Edge::Right, false);
                 win.set_anchor(Edge::Top, false);
-                win.set_margin(Edge::Bottom, cfg.margin_y);
+                win.set_margin(Edge::Bottom, margin_y);
             }
         }
     }
@@ -227,14 +229,14 @@ fn setup_layer_shell(win: &ApplicationWindow) {
     }
 }
 
-fn build_header(notification: &Notification, config: &Config, win: &ApplicationWindow) -> GtkBox {
+fn build_header(notification: &Notification, config: &GeneralConfig, win: &ApplicationWindow) -> GtkBox {
     let win = win.clone();
     let hbox = GtkBox::new(Orientation::Horizontal, 8);
 
     // App icon
     if !notification.app_icon.is_empty() {
         let icon = gtk4::Image::from_icon_name(&notification.app_icon);
-        icon.set_pixel_size(config.general.icon_size);
+        icon.set_pixel_size(config.icon_size);
         hbox.append(&icon);
     }
 
@@ -324,8 +326,8 @@ fn build_actions(
     Some(action_box)
 }
 
-fn setup_auto_dismiss(win: &ApplicationWindow, notification: &Notification, config: &Config) {
-    if let Some(ms) = notification.display_duration_ms(config.general.timeout) {
+fn setup_auto_dismiss(win: &ApplicationWindow, notification: &Notification, config: &GeneralConfig) {
+    if let Some(ms) = notification.display_duration_ms(config.timeout) {
         let win = win.clone();
         gtk4::glib::timeout_add_local_once(
             std::time::Duration::from_millis(u64::from(ms)),
@@ -337,7 +339,7 @@ fn setup_auto_dismiss(win: &ApplicationWindow, notification: &Notification, conf
 fn build_notification_window(
     app: &Application,
     notification: &Notification,
-    config: &Config,
+    config: &GeneralConfig,
     action_tx: mpsc::UnboundedSender<(u32, String)>,
 ) -> ApplicationWindow {
     let win = ApplicationWindow::new(app);
@@ -363,7 +365,7 @@ fn build_notification_window(
     }
 
     win.set_child(Some(&vbox));
-    win.set_default_width(config.general.width);
+    win.set_default_width(config.width);
 
     setup_auto_dismiss(&win, notification, config);
 
