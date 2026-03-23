@@ -75,28 +75,31 @@ pub struct NotificationManager {
     config: SharedConfig,
     windows: Vec<(u32, ApplicationWindow)>,
     action_tx: mpsc::UnboundedSender<(u32, String)>,
+    css_provider: gtk4::CssProvider,
 }
 
 impl NotificationManager {
     pub fn new(config: SharedConfig, action_tx: mpsc::UnboundedSender<(u32, String)>) -> Self {
-        Self { config, windows: Vec::new(), action_tx }
-    }
-
-    /// Load CSS into the GTK display. Must be called after the GTK display is ready.
-    pub fn init_css(&self) {
+        let css_provider = gtk4::CssProvider::new();
         if let Some(display) = gdk::Display::default() {
-            let provider = gtk4::CssProvider::new();
-            let css = {
-                let cfg = self.config.read().unwrap();
-                build_css(&cfg)
-            };
-            provider.load_from_string(&css);
             gtk4::style_context_add_provider_for_display(
                 &display,
-                &provider,
+                &css_provider,
                 gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
+        Self { config, windows: Vec::new(), action_tx, css_provider }
+    }
+
+    /// Load CSS into the GTK display. Must be called after the GTK display is ready.
+    /// On subsequent calls (e.g. hot-reload), updates the existing provider rather than
+    /// registering a new one, preventing provider accumulation.
+    pub fn init_css(&self) {
+        let css = {
+            let cfg = self.config.read().unwrap();
+            build_css(&cfg)
+        };
+        self.css_provider.load_from_string(&css);
     }
 
     /// Remove windows that have already been destroyed.

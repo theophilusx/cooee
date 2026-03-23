@@ -9,7 +9,7 @@ pub mod action_picker;
 
 use anyhow::Result;
 use gtk4::prelude::*;
-use gtk4::{gio, Application};
+use gtk4::Application;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
