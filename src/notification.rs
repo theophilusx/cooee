@@ -1,5 +1,9 @@
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
 /// Urgency level per freedesktop.org spec
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(into = "u8", from = "u8")]
 pub enum Urgency {
     Low = 0,
     Normal = 1,
@@ -16,8 +20,28 @@ impl From<u8> for Urgency {
     }
 }
 
+impl From<Urgency> for u8 {
+    fn from(u: Urgency) -> u8 {
+        match u {
+            Urgency::Low      => 0,
+            Urgency::Normal   => 1,
+            Urgency::Critical => 2,
+        }
+    }
+}
+
+impl fmt::Display for Urgency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Urgency::Low      => write!(f, "low"),
+            Urgency::Normal   => write!(f, "normal"),
+            Urgency::Critical => write!(f, "critical"),
+        }
+    }
+}
+
 /// A single action (key + display label) provided by the sending app
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Action {
     pub key: String,
     pub label: String,
@@ -52,7 +76,7 @@ pub struct ImageData {
 }
 
 /// A received desktop notification
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Notification {
     pub id: u32,
     pub app_name: String,
@@ -63,9 +87,13 @@ pub struct Notification {
     pub urgency: Urgency,
     /// Expiry in milliseconds; 0 = server default, -1 = persistent
     pub expire_timeout: i32,
+    /// Timestamp when this notification was received by the daemon
+    pub received_at: chrono::DateTime<chrono::Local>,
     /// Structured image data from the `image-data` hint
+    #[serde(skip)]
     pub image_data: Option<ImageData>,
     /// File path or icon-theme name from the `image-path` hint
+    #[serde(skip)]
     pub image_path: Option<String>,
     /// Non-zero means this notification replaces the one with this ID
     pub replaces_id: u32,
@@ -94,6 +122,7 @@ impl Notification {
             actions: parse_actions(&actions),
             urgency: Urgency::from(urgency),
             expire_timeout,
+            received_at: chrono::Local::now(),
             image_data,
             image_path,
             replaces_id,
@@ -192,5 +221,25 @@ mod tests {
         assert_eq!(n.replaces_id, 7);
         assert!(n.image_data.is_some());
         assert_eq!(n.image_path.as_deref(), Some("/path/to/img.png"));
+    }
+
+    #[test]
+    fn test_urgency_display() {
+        assert_eq!(format!("{}", Urgency::Low),      "low");
+        assert_eq!(format!("{}", Urgency::Normal),   "normal");
+        assert_eq!(format!("{}", Urgency::Critical), "critical");
+        assert_eq!(format!("{}", Urgency::from(0)), "low");
+        assert_eq!(format!("{}", Urgency::from(1)), "normal");
+        assert_eq!(format!("{}", Urgency::from(2)), "critical");
+    }
+
+    #[test]
+    fn test_notification_serialises_received_at_not_image_data() {
+        let n = make_notification(0);
+        let json = serde_json::to_string(&n).unwrap();
+        assert!(json.contains("\"received_at\""),
+            "expected received_at in JSON, got: {json}");
+        assert!(!json.contains("\"image_data\""),
+            "image_data should be skipped, got: {json}");
     }
 }

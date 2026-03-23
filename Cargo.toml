@@ -30,6 +30,9 @@ clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 
+# Date/time
+chrono = { version = "0", features = ["serde"] }
+
 # Socket protocol
 serde_json = "1"
 
