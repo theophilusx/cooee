@@ -272,8 +272,13 @@ async fn handle_command(
             let status = format!("running | DND: {}", s.dnd_mode_str());
             Response::ok_status(&status)
         }
-        Command::History { .. } => {
-            Response::err("history not yet implemented")
+        Command::History { count } => {
+            let entries = state.lock().unwrap()
+                .get_history(count)
+                .into_iter()
+                .cloned()
+                .collect();
+            Response::ok_history(entries)
         }
     }
 }
