@@ -166,6 +166,20 @@ impl Default for ActionsConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HistoryConfig {
+    #[serde(default = "HistoryConfig::default_max_entries")]
+    pub max_entries: usize,
+}
+
+impl HistoryConfig {
+    fn default_max_entries() -> usize { 50 }
+}
+
+impl Default for HistoryConfig {
+    fn default() -> Self { Self { max_entries: 50 } }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Config {
     #[serde(default)]
@@ -178,6 +192,8 @@ pub struct Config {
     pub dnd: DndConfig,
     #[serde(default)]
     pub actions: ActionsConfig,
+    #[serde(default)]
+    pub history: HistoryConfig,
 }
 
 impl Config {
@@ -303,6 +319,34 @@ margin_x = 32
     fn test_expand_path_passthrough_absolute() {
         let p = Config::expand_path("/absolute/path");
         assert_eq!(p.to_str().unwrap(), "/absolute/path");
+    }
+
+    #[test]
+    fn test_history_config_default_max_entries() {
+        let cfg = Config::default();
+        assert_eq!(cfg.history.max_entries, 50);
+    }
+
+    #[test]
+    fn test_history_config_toml_override() {
+        let toml = r#"
+[history]
+max_entries = 100
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.history.max_entries, 100);
+        // other fields still at defaults
+        assert_eq!(cfg.general.margin_x, 16);
+    }
+
+    #[test]
+    fn test_history_config_zero_disables() {
+        let toml = r#"
+[history]
+max_entries = 0
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.history.max_entries, 0);
     }
 
     #[test]
