@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use crate::notification::Notification;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
@@ -13,10 +14,14 @@ pub enum Command {
     Dismiss,
     Action,
     Status,
+    History {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        count: Option<usize>,
+    },
 }
 
 /// Responses the daemon sends back
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Response {
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,13 +30,18 @@ pub struct Response {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub history: Option<Vec<Notification>>,
 }
 
 impl Response {
-    pub fn ok() -> Self { Self { ok: true, dnd: None, error: None, status: None } }
-    pub fn ok_dnd(mode: &str) -> Self { Self { ok: true, dnd: Some(mode.to_string()), error: None, status: None } }
-    pub fn err(msg: &str) -> Self { Self { ok: false, dnd: None, error: Some(msg.to_string()), status: None } }
-    pub fn ok_status(s: &str) -> Self { Self { ok: true, dnd: None, error: None, status: Some(s.to_string()) } }
+    pub fn ok() -> Self { Self { ok: true, dnd: None, error: None, status: None, history: None } }
+    pub fn ok_dnd(mode: &str) -> Self { Self { ok: true, dnd: Some(mode.to_string()), error: None, status: None, history: None } }
+    pub fn err(msg: &str) -> Self { Self { ok: false, dnd: None, error: Some(msg.to_string()), status: None, history: None } }
+    pub fn ok_status(s: &str) -> Self { Self { ok: true, dnd: None, error: None, status: Some(s.to_string()), history: None } }
+    pub fn ok_history(entries: Vec<Notification>) -> Self {
+        Self { ok: true, history: Some(entries), ..Default::default() }
+    }
 }
 
 pub fn socket_path() -> PathBuf {
@@ -115,6 +125,45 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         assert!(json.contains("\"ok\":false"));
         assert!(json.contains("\"error\":\"no notification\""));
+    }
+
+    #[test]
+    fn test_command_serialise_history_no_count() {
+        let cmd = Command::History { count: None };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert_eq!(json, r#"{"cmd":"history"}"#);
+    }
+
+    #[test]
+    fn test_command_serialise_history_with_count() {
+        let cmd = Command::History { count: Some(5) };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert_eq!(json, r#"{"cmd":"history","count":5}"#);
+    }
+
+    #[test]
+    fn test_command_deserialise_history_no_count() {
+        let cmd: Command = serde_json::from_str(r#"{"cmd":"history"}"#).unwrap();
+        assert_eq!(cmd, Command::History { count: None });
+    }
+
+    #[test]
+    fn test_command_deserialise_history_with_count() {
+        let cmd: Command = serde_json::from_str(r#"{"cmd":"history","count":5}"#).unwrap();
+        assert_eq!(cmd, Command::History { count: Some(5) });
+    }
+
+    #[test]
+    fn test_response_ok_history_empty_serialise() {
+        let r = Response::ok_history(vec![]);
+        let json = serde_json::to_string(&r).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["ok"], true);
+        assert!(v["history"].is_array());
+        assert!(v["history"].as_array().unwrap().is_empty());
+        assert!(v.get("dnd").is_none(),   "dnd should not appear: {json}");
+        assert!(v.get("error").is_none(), "error should not appear: {json}");
+        assert!(v.get("status").is_none(),"status should not appear: {json}");
     }
 
     #[test]
