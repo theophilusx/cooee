@@ -1,16 +1,15 @@
 use anyhow::Result;
 use std::collections::HashMap;
-use std::sync::Arc;
 use zbus::{interface, Connection, SignalContext};
 use crate::notification::{Notification, ImageData};
-use crate::config::{Config, DndMode};
+use crate::config::{DndMode, SharedConfig};
 use crate::daemon::state::SharedState;
 use crate::daemon::ui::UiEvent;
 use tokio::sync::mpsc;
 
 pub struct NotificationServer {
     state: SharedState,
-    config: Arc<Config>,
+    config: SharedConfig,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
 }
 
@@ -88,9 +87,13 @@ impl NotificationServer {
         drop(state);
 
         if !is_silent {
-            let sound = crate::daemon::sound::SoundPlayer::new(self.config.sound.clone());
+            let (sound_config, tts_config) = {
+                let cfg = self.config.read().unwrap();
+                (cfg.sound.clone(), cfg.tts.clone())
+            };
+            let sound = crate::daemon::sound::SoundPlayer::new(sound_config);
             sound.play();
-            let tts = crate::daemon::tts::TtsClient::new(self.config.tts.clone());
+            let tts = crate::daemon::tts::TtsClient::new(tts_config);
             tts.speak_smart(&notification.summary, &notification.body);
         }
 
@@ -145,7 +148,7 @@ pub async fn emit_action_invoked(conn: &Connection, id: u32, action_key: String)
 
 pub async fn start_dbus_server(
     state: SharedState,
-    config: Arc<Config>,
+    config: SharedConfig,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
 ) -> Result<Connection> {
     let server = NotificationServer { state, config, ui_tx };

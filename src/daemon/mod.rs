@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
-use crate::config::{Config, DndMode};
+use crate::config::{Config, DndMode, SharedConfig};
 use crate::daemon::state::new_shared_state;
 use crate::daemon::ui::{NotificationManager, UiEvent};
 
@@ -24,9 +24,9 @@ const APP_ID: &str = "org.theophilusx.cooee";
 type EventQueue = Arc<Mutex<VecDeque<UiEvent>>>;
 
 pub fn run() -> Result<()> {
-    let config = Arc::new(Config::load()?);
+    let config = Config::load()?.shared();
 
-    let initial_dnd = config.dnd.mode.clone();
+    let initial_dnd = config.read().unwrap().dnd.mode.clone();
     let shared_state = new_shared_state(initial_dnd);
 
     // Channel: D-Bus server → tokio bridge task → glib main loop
@@ -136,7 +136,7 @@ pub fn run() -> Result<()> {
 
 async fn socket_server(
     state: crate::daemon::state::SharedState,
-    config: Arc<Config>,
+    config: SharedConfig,
     event_queue: EventQueue,
     action_tx: mpsc::UnboundedSender<(u32, String)>,
 ) {
@@ -174,7 +174,7 @@ async fn socket_server(
 async fn handle_command(
     cmd: crate::daemon::socket::Command,
     state: &crate::daemon::state::SharedState,
-    config: &Config,
+    config: &SharedConfig,
     event_queue: &EventQueue,
     action_tx: &mpsc::UnboundedSender<(u32, String)>,
 ) -> crate::daemon::socket::Response {
@@ -186,7 +186,8 @@ async fn handle_command(
             match notification {
                 None => Response::err("no notification to speak"),
                 Some(n) => {
-                    let tts = tts::TtsClient::new(config.tts.clone());
+                    let tts_config = config.read().unwrap().tts.clone();
+                    let tts = tts::TtsClient::new(tts_config);
                     let text = if n.body.is_empty() { &n.summary } else { &n.body };
                     tts.speak_body(text);
                     Response::ok()
@@ -221,7 +222,8 @@ async fn handle_command(
                     if n.actions.is_empty() {
                         return Response::err("last notification has no actions");
                     }
-                    match action_picker::pick_action(&config.actions.picker, &n.actions) {
+                    let picker = config.read().unwrap().actions.picker.clone();
+                    match action_picker::pick_action(&picker, &n.actions) {
                         Ok(action) => {
                             let _ = action_tx.send((n.id, action.key));
                             Response::ok()

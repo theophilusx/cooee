@@ -1,9 +1,8 @@
 use gtk4::prelude::*;
 use gtk4::{gdk, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use crate::config::{Config, Position};
+use crate::config::{Config, Position, SharedConfig};
 use crate::notification::Notification;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 /// Generates the CSS string for notification windows based on config.
@@ -72,13 +71,13 @@ pub enum UiEvent {
 
 /// Manages the stack of visible notification windows
 pub struct NotificationManager {
-    config: Arc<Config>,
+    config: SharedConfig,
     windows: Vec<(u32, ApplicationWindow)>,
     action_tx: mpsc::UnboundedSender<(u32, String)>,
 }
 
 impl NotificationManager {
-    pub fn new(config: Arc<Config>, action_tx: mpsc::UnboundedSender<(u32, String)>) -> Self {
+    pub fn new(config: SharedConfig, action_tx: mpsc::UnboundedSender<(u32, String)>) -> Self {
         Self { config, windows: Vec::new(), action_tx }
     }
 
@@ -86,7 +85,11 @@ impl NotificationManager {
     pub fn init_css(&self) {
         if let Some(display) = gdk::Display::default() {
             let provider = gtk4::CssProvider::new();
-            provider.load_from_string(&build_css(&self.config));
+            let css = {
+                let cfg = self.config.read().unwrap();
+                build_css(&cfg)
+            };
+            provider.load_from_string(&css);
             gtk4::style_context_add_provider_for_display(
                 &display,
                 &provider,
@@ -105,14 +108,19 @@ impl NotificationManager {
         if notification.replaces_id > 0 {
             self.close(notification.replaces_id);
         }
+        // Snapshot config fields before GTK work
+        let (max_visible, config_snapshot) = {
+            let cfg = self.config.read().unwrap();
+            (cfg.general.max_visible, cfg.clone())
+        };
         // Evict oldest if at capacity
-        if self.windows.len() >= self.config.general.max_visible {
+        if self.windows.len() >= max_visible {
             if let Some((_, win)) = self.windows.first() {
                 win.destroy();
             }
             self.windows.remove(0);
         }
-        let win = build_notification_window(app, &notification, &self.config, self.action_tx.clone());
+        let win = build_notification_window(app, &notification, &config_snapshot, self.action_tx.clone());
         self.position_window(&win);
         win.present();
         self.windows.push((notification.id, win));
@@ -134,7 +142,8 @@ impl NotificationManager {
     }
 
     fn position_window(&self, win: &ApplicationWindow) {
-        let cfg = &self.config.general;
+        let config_guard = self.config.read().unwrap();
+        let cfg = &config_guard.general;
 
         match cfg.position {
             Position::TopRight => {

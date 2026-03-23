@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+
+pub type SharedConfig = Arc<RwLock<Config>>;
 
 macro_rules! default_val {
     ($name:ident, $ty:ty, $val:expr) => {
@@ -178,6 +181,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn shared(self) -> SharedConfig {
+        Arc::new(RwLock::new(self))
+    }
+
     pub fn load() -> Result<Self> {
         let path = config_path();
         if !path.exists() {
