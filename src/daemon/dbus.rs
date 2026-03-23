@@ -33,9 +33,6 @@ impl NotificationServer {
             .and_then(|v| u8::try_from(v).ok())
             .unwrap_or(1);
 
-        // TODO: parse "image-data" hint; add "body-images" to capabilities when implemented
-        let image_data: Option<Vec<u8>> = None;
-
         // Check DND Full — discard the notification but still emit NotificationClosed
         let dnd_full_id = {
             let mut state = self.state.lock().unwrap();
@@ -54,7 +51,8 @@ impl NotificationServer {
 
         let id = if replaces_id > 0 { replaces_id } else { state.next_notification_id() };
         let notification = Notification::new(
-            id, app_name, app_icon, summary, body, actions, urgency, expire_timeout, image_data,
+            id, app_name, app_icon, summary, body, actions, urgency, expire_timeout,
+            None, None, replaces_id,
         );
         state.last_notification = Some(notification.clone());
         let is_silent = matches!(state.dnd_mode, DndMode::Silent);

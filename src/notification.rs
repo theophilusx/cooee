@@ -39,6 +39,18 @@ pub fn parse_actions(flat: &[String]) -> Vec<Action> {
         .collect()
 }
 
+/// Raw image data from the `image-data` D-Bus hint (freedesktop spec §image-data).
+#[derive(Debug, Clone)]
+pub struct ImageData {
+    pub width: i32,
+    pub height: i32,
+    pub rowstride: i32,
+    pub has_alpha: bool,
+    pub bits_per_sample: i32,
+    pub n_channels: i32,
+    pub data: Vec<u8>,
+}
+
 /// A received desktop notification
 #[derive(Debug, Clone)]
 pub struct Notification {
@@ -51,8 +63,12 @@ pub struct Notification {
     pub urgency: Urgency,
     /// Expiry in milliseconds; 0 = server default, -1 = persistent
     pub expire_timeout: i32,
-    /// Raw image data from hints (optional)
-    pub image_data: Option<Vec<u8>>,
+    /// Structured image data from the `image-data` hint
+    pub image_data: Option<ImageData>,
+    /// File path or icon-theme name from the `image-path` hint
+    pub image_path: Option<String>,
+    /// Non-zero means this notification replaces the one with this ID
+    pub replaces_id: u32,
 }
 
 impl Notification {
@@ -65,7 +81,9 @@ impl Notification {
         actions: Vec<String>,
         urgency: u8,
         expire_timeout: i32,
-        image_data: Option<Vec<u8>>,
+        image_data: Option<ImageData>,
+        image_path: Option<String>,
+        replaces_id: u32,
     ) -> Self {
         Self {
             id,
@@ -77,6 +95,8 @@ impl Notification {
             urgency: Urgency::from(urgency),
             expire_timeout,
             image_data,
+            image_path,
+            replaces_id,
         }
     }
 
@@ -153,9 +173,24 @@ mod tests {
     }
 
     fn make_notification(expire_timeout: i32) -> Notification {
-        Notification::new(
-            1, "app".into(), "".into(), "Summary".into(), "Body".into(),
-            vec![], 1, expire_timeout, None,
-        )
+        Notification::new(1, "app".into(), "".into(), "Summary".into(), "Body".into(),
+            vec![], 1, expire_timeout, None, None, 0)
+    }
+
+    #[test]
+    fn test_notification_new_with_image_and_replaces() {
+        let img = ImageData {
+            width: 64, height: 64, rowstride: 64 * 4,
+            has_alpha: true, bits_per_sample: 8, n_channels: 4,
+            data: vec![0u8; 64 * 64 * 4],
+        };
+        let n = Notification::new(
+            42, "app".into(), "icon".into(), "Hello".into(), "World".into(),
+            vec![], 1, 0, Some(img), Some("/path/to/img.png".into()), 7,
+        );
+        assert_eq!(n.id, 42);
+        assert_eq!(n.replaces_id, 7);
+        assert!(n.image_data.is_some());
+        assert_eq!(n.image_path.as_deref(), Some("/path/to/img.png"));
     }
 }
