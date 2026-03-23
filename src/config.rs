@@ -2,6 +2,12 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+macro_rules! default_val {
+    ($name:ident, $ty:ty, $val:expr) => {
+        fn $name() -> $ty { $val }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Position {
@@ -51,14 +57,14 @@ pub struct GeneralConfig {
 }
 
 impl GeneralConfig {
-    fn default_position() -> Position { Position::TopRight }
-    fn default_margin_x() -> i32 { 16 }
-    fn default_margin_y() -> i32 { 48 }
-    fn default_max_visible() -> usize { 5 }
-    fn default_timeout() -> u32 { 5000 }
-    fn default_icon_size() -> i32 { 36 }
-    fn default_width() -> i32 { 360 }
-    fn default_font_size() -> i32 { 14 }
+    default_val!(default_position, Position, Position::TopRight);
+    default_val!(default_margin_x, i32, 16);
+    default_val!(default_margin_y, i32, 48);
+    default_val!(default_max_visible, usize, 5);
+    default_val!(default_timeout, u32, 5000);
+    default_val!(default_icon_size, i32, 36);
+    default_val!(default_width, i32, 360);
+    default_val!(default_font_size, i32, 14);
 }
 
 impl Default for GeneralConfig {
@@ -88,11 +94,9 @@ pub struct SoundConfig {
 }
 
 impl SoundConfig {
-    fn default_enabled() -> bool { true }
-    fn default_file() -> String {
-        "~/.config/cooee/sounds/notify.ogg".to_string()
-    }
-    fn default_volume() -> f64 { 0.8 }
+    default_val!(default_enabled, bool, true);
+    default_val!(default_file, String, "~/.config/cooee/sounds/notify.ogg".to_string());
+    default_val!(default_volume, f64, 0.8);
 }
 
 impl Default for SoundConfig {
@@ -120,9 +124,9 @@ pub struct TtsConfig {
 }
 
 impl TtsConfig {
-    fn default_enabled() -> bool { true }
-    fn default_speak_summary() -> bool { true }
-    fn default_body_word_limit() -> u32 { 15 }
+    default_val!(default_enabled, bool, true);
+    default_val!(default_speak_summary, bool, true);
+    default_val!(default_body_word_limit, u32, 15);
 }
 
 impl Default for TtsConfig {
@@ -150,9 +154,7 @@ pub struct ActionsConfig {
 }
 
 impl ActionsConfig {
-    fn default_picker() -> String {
-        "rofi -dmenu -p 'Action:'".to_string()
-    }
+    default_val!(default_picker, String, "rofi -dmenu -p 'Action:'".to_string());
 }
 
 impl Default for ActionsConfig {
