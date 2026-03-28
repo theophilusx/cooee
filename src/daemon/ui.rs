@@ -1,6 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{gdk, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
+use pango;
 use crate::config::{Config, GeneralConfig, Position, SharedConfig};
 use crate::notification::Notification;
 use tokio::sync::mpsc;
@@ -257,16 +258,36 @@ fn build_header(notification: &Notification, config: &GeneralConfig, win: &Appli
     hbox
 }
 
-fn build_body(notification: &Notification) -> Option<Label> {
+/// Returns `true` when `text` is valid Pango markup.
+/// Plain text with no `<` or `&` characters always passes.
+/// HTML-specific elements such as `<br>` or `&nbsp;` fail.
+fn is_valid_pango_markup(text: &str) -> bool {
+    pango::parse_markup(text, '\0').is_ok()
+}
+
+fn build_body(notification: &Notification) -> Option<gtk4::ScrolledWindow> {
     if notification.body.is_empty() {
         return None;
     }
-    let body = Label::new(None);
-    body.set_markup(&notification.body);
-    body.set_wrap(true);
-    body.set_xalign(0.0);
-    body.add_css_class("notification-body");
-    Some(body)
+    let label = Label::new(None);
+    label.set_wrap(true);
+    label.set_xalign(0.0);
+    label.add_css_class("notification-body");
+    // Freedesktop notification bodies may use HTML markup (<br>, &nbsp;, etc.)
+    // that Pango does not support. set_markup silently leaves the label blank on
+    // parse failure, so we validate first and fall back to plain text.
+    if is_valid_pango_markup(&notification.body) {
+        label.set_markup(&notification.body);
+    } else {
+        label.set_text(&notification.body);
+    }
+    let scrolled = gtk4::ScrolledWindow::new();
+    scrolled.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
+    scrolled.set_propagate_natural_height(true);
+    scrolled.set_max_content_height(240);
+    scrolled.set_has_frame(false);
+    scrolled.set_child(Some(&label));
+    Some(scrolled)
 }
 
 fn build_image(notification: &Notification) -> Option<gtk4::Image> {
@@ -403,5 +424,47 @@ mod tests {
         let cfg = test_config_with_font_size(14);
         let css = build_css(&cfg);
         assert!(css.contains("font-size: 13px"), "body should be 13px");
+    }
+
+    // --- is_valid_pango_markup ---
+
+    #[test]
+    fn plain_text_is_valid_pango_markup() {
+        assert!(is_valid_pango_markup("IBus is not configured."));
+    }
+
+    #[test]
+    fn pango_bold_tag_is_valid() {
+        assert!(is_valid_pango_markup("<b>bold</b> and <i>italic</i>"));
+    }
+
+    #[test]
+    fn html_br_tag_is_invalid_pango_markup() {
+        assert!(!is_valid_pango_markup("Line 1<br>Line 2"));
+    }
+
+    #[test]
+    fn html_br_self_closing_is_invalid_pango_markup() {
+        assert!(!is_valid_pango_markup("Line 1<br/>Line 2"));
+    }
+
+    #[test]
+    fn nbsp_entity_is_invalid_pango_markup() {
+        assert!(!is_valid_pango_markup("text &nbsp; more text"));
+    }
+
+    #[test]
+    fn standard_xml_entities_are_valid_pango_markup() {
+        assert!(is_valid_pango_markup("5 &lt; 10 &amp; foo &gt; bar"));
+    }
+
+    #[test]
+    fn build_body_empty_returns_none() {
+        use crate::notification::Notification;
+        let n = Notification::new(
+            1, "app".into(), "".into(), "Summary".into(), "".into(),
+            vec![], 1, 0, None, None, 0,
+        );
+        assert!(build_body(&n).is_none());
     }
 }
