@@ -1,7 +1,6 @@
 use gtk4::prelude::*;
 use gtk4::{gdk, Application, ApplicationWindow, Box as GtkBox, Button, Label, Orientation};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use pango;
 use crate::config::{Config, GeneralConfig, Position, SharedConfig};
 use crate::notification::Notification;
 use tokio::sync::mpsc;
