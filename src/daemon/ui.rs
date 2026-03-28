@@ -56,6 +56,9 @@ pub fn build_css(config: &Config) -> String {
 .notification-action-btn:hover {{
     background-color: rgba(120, 160, 230, 0.24);
 }}
+.notification-image {{
+    max-height: 96px;
+}}
 "#)
 }
 
@@ -289,7 +292,7 @@ fn build_body(notification: &Notification) -> Option<gtk4::ScrolledWindow> {
     Some(scrolled)
 }
 
-fn build_image(notification: &Notification) -> Option<gtk4::Image> {
+fn build_image(notification: &Notification) -> Option<gtk4::Widget> {
     if let Some(d) = &notification.image_data {
         if d.rowstride <= 0 { return None; }
         let stride = d.rowstride as usize;
@@ -305,21 +308,29 @@ fn build_image(notification: &Notification) -> Option<gtk4::Image> {
             &gtk4::glib::Bytes::from(&d.data),
             stride,
         );
-        let image = gtk4::Image::from_paintable(Some(&texture));
-        image.add_css_class("notification-image");
-        return Some(image);
+        // Use Picture so can_shrink=true allows CSS max-height to scale it down.
+        let picture = gtk4::Picture::for_paintable(&texture);
+        picture.set_can_shrink(true);
+        picture.set_content_fit(gtk4::ContentFit::Contain);
+        picture.add_css_class("notification-image");
+        return Some(picture.upcast());
     }
 
     if let Some(p) = &notification.image_path {
-        let image = if p.starts_with('/') {
-            gtk4::Image::from_file(p)
-        } else if p.starts_with("file://") {
-            gtk4::Image::from_file(&p["file://".len()..])
+        if p.starts_with('/') || p.starts_with("file://") {
+            let path = if p.starts_with("file://") { &p["file://".len()..] } else { p.as_str() };
+            let picture = gtk4::Picture::for_filename(path);
+            picture.set_can_shrink(true);
+            picture.set_content_fit(gtk4::ContentFit::Contain);
+            picture.add_css_class("notification-image");
+            return Some(picture.upcast());
         } else {
-            gtk4::Image::from_icon_name(p)
-        };
-        image.add_css_class("notification-image");
-        return Some(image);
+            // Icon-name: set_pixel_size caps the rendered size.
+            let image = gtk4::Image::from_icon_name(p);
+            image.set_pixel_size(96);
+            image.add_css_class("notification-image");
+            return Some(image.upcast());
+        }
     }
 
     None
@@ -423,6 +434,20 @@ mod tests {
         let cfg = test_config_with_font_size(14);
         let css = build_css(&cfg);
         assert!(css.contains("font-size: 13px"), "body should be 13px");
+    }
+
+    #[test]
+    fn build_css_contains_notification_image_max_height() {
+        let cfg = Config::default();
+        let css = build_css(&cfg);
+        assert!(
+            css.contains(".notification-image"),
+            "expected .notification-image rule in CSS, got:\n{css}"
+        );
+        assert!(
+            css.contains("max-height"),
+            "expected max-height constraint in .notification-image, got:\n{css}"
+        );
     }
 
     // --- is_valid_pango_markup ---
