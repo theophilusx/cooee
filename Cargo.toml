@@ -10,7 +10,7 @@ description = "Wayland desktop notification daemon with sound and TTS"
 # UI / Wayland
 gtk4 = { version = "0.11", features = ["v4_12"] }
 gtk4-layer-shell = "0.8"
-pango = "0.19"
+pango = "0.22"
 
 # D-Bus
 zbus = { version = "4", features = ["tokio"] }
